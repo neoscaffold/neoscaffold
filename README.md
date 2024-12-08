@@ -5,7 +5,7 @@
   </a>
   <!-- Chat Badge -->
   <a href='https://discord.gg/fWncYRBY'>
-    <img src='https://img.shields.io/badge/chat-discord-blue?style=for-the-badge'>
+    <img src='https://img.shields.io/badge/chat-discord-magenta?logo=discord&style=for-the-badge'>
   </a>
   <!-- Docs Badge -->
   <a href=''>
