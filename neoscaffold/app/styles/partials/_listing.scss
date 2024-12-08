@@ -1,0 +1,79 @@
+// For all screen sizes
+#pct {
+  .w.lds {
+    h1, h2, h3, h4, h5, h6 {
+      color: $attract;
+    }
+    h2 {
+      border-bottom: solid 2px $attract;
+      padding-bottom: 10px;
+    }
+    img {
+      max-width: 100%;
+    }
+  }
+  .w.lrl {
+    h2 {
+      border-bottom: solid 2px $attract;
+      padding-bottom: 10px;
+    }
+  }
+  .w.lg {
+    .lt {
+      background-position: 50%;
+      background-repeat: no-repeat;
+      background-size: auto 100%;
+      width: calc(40% - 30px);
+      .fa {
+        color: $foreground;
+      }
+      // Center the image if it's too small
+      img {
+        margin: 0 auto;
+      }
+    }
+    .md {
+      background-color: $foreground;
+      color: $copy;
+      text-align: right;
+      width: calc(60% - 50px);
+      button {
+        display: inline-block;
+        margin: 20px 0px 0px 20px;
+      }
+      .hl, .hf {
+        @include inline-vertical-top;
+        font-size: 20px;
+        padding: 20px 10px 0 0;
+        text-align: right;
+        width: calc(50% - 10px);
+        .fa {
+          margin-left: 10px;
+        }
+        .pr {
+          margin-bottom: 10px;
+        }
+      }
+      .hl {
+        overflow: hidden;
+        padding: 20px 0 0 10px;
+        text-align: left;
+      }
+    }
+    .ems {
+      position: relative;
+    }
+    .ems-nav {
+      display: none;
+    }
+    .ems-progress {
+      bottom: 18px;
+      position: absolute;
+    }
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+  }
+}

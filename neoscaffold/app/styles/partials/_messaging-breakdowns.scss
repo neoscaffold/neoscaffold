@@ -1,0 +1,39 @@
+@media (max-width: $desktop-1) and (min-width: $mobile-1 + 1) {
+  div.chat-pnl {
+    width: inherit;
+  }
+}
+@media (max-width: $tablet-1) {
+  .efc-pnl {
+    margin: 0 0 30px 0;
+    width: calc(100% - 20px);
+  }
+}
+@media (min-width: $mobile-1 + 1px) {
+  div.chat-pnl {
+    .cht {
+      height: calc( ( 100dvh - ( ( 60px + env(safe-area-inset-top, 0) ) + ( 60px + env(safe-area-inset-bottom, 0) ) ) - 100px ));
+    }
+  }
+}
+.efc-pnl {
+  @media screen and (max-width: $tablet-1) {
+    .msg img {
+      width: 300px;
+    }
+  }
+  @media screen and (max-width: mobile-1) {
+    .msg img {
+      width: 200px;
+    }
+  }
+}
+
+// Center the ember-chat on mobile
+@media (max-width: $mobile-1) {
+  div.chat-pnl {
+    box-shadow: none;
+    margin: 0;
+    width: auto;
+  }
+}

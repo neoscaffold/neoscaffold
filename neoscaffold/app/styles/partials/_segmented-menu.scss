@@ -1,0 +1,39 @@
+#pct {
+  .sg {
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 10px;
+    width: 100%;
+    .sgb {
+      background-color: transparent;
+      border: solid 1px $copy;
+      border-left: none;
+      border-radius: 0;
+      color: $copy;
+      flex: 1 0 0;
+      margin: 0;
+      outline: 0;
+      overflow: hidden;
+      padding: 10px 0;
+      text-align: center;
+      text-overflow: ellipsis;
+      &.active {
+        color: $text;
+        background-color: $attract;
+        border-color: $copy;
+      }
+    }
+    > .sgb:first-child {
+      border-bottom-left-radius: 10px;
+      border-left: solid 1px $copy;
+      border-top-left-radius: 10px;
+      &.active {
+        border-color: $copy;
+      }
+    }
+    > .sgb:last-child {
+      border-top-right-radius: 10px;
+      border-bottom-right-radius: 10px;
+    }
+  }
+}

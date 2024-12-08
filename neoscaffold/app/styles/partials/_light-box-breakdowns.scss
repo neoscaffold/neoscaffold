@@ -1,0 +1,11 @@
+// mobile and tablet
+@media (max-width: $tablet-1) {
+  #pct {
+    // lightbox adjustments for make offer lightbox
+    .lbx {
+      .content-backdrop {
+        overflow-y: scroll;
+      }
+    }
+  }
+}

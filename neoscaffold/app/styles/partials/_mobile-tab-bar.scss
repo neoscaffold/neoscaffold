@@ -1,0 +1,35 @@
+menu.mtb {
+  background-color: $foreground;
+  // bottom: calc(0 - env(safe-area-inset-bottom, 0));
+  bottom: calc(-50px + env(safe-area-inset-bottom, 0));
+  border-top: solid 1px $background;
+  color: $copy;
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  height: 99px;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+  position: fixed;
+  -webkit-transform: translate3d(0,0,1px);
+  transform: translate3d(0,0,1px);
+  width: 100%;
+  z-index: 10001;
+  nav {
+    flex: 1 0 0;
+    text-align: center;
+    .fa {
+      display: block;
+      font-size: 35px;
+      margin: 7px 0;
+    }
+    img.ictb {
+      height: 36px;
+      margin-top: 7px;
+    }
+    &.cn {
+      // background-color: $text;
+    }
+  }
+}

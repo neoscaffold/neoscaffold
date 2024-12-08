@@ -1,0 +1,1805 @@
+@keyframes fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Firefox < 16 */
+@-moz-keyframes fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Safari, Chrome and Opera > 12.1 */
+@-webkit-keyframes fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Internet Explorer */
+@-ms-keyframes fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Opera < 12.1 */
+@-o-keyframes fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@mixin fade($duration) {
+  -webkit-animation: fadein $duration; /* Safari, Chrome and Opera > 12.1 */
+  -moz-animation: fadein $duration; /* Firefox < 16 */
+  -ms-animation: fadein $duration; /* Internet Explorer */
+  -o-animation: fadein $duration; /* Opera < 12.1 */
+  animation: fadein $duration;
+}
+
+
+@keyframes slideright {
+  from { right: 22px; }
+  to   { right: 2px; }
+}
+
+/* Firefox < 16 */
+@-moz-keyframes slideright {
+  from { right: 22px; }
+  to   { right: 2px; }
+}
+
+/* Safari, Chrome and Opera > 12.1 */
+@-webkit-keyframes slideright {
+  from { right: 22px; }
+  to   { right: 2px; }
+}
+
+/* Internet Explorer */
+@-ms-keyframes slideright {
+  from { right: 22px; }
+  to   { right: 2px; }
+}
+
+/* Opera < 12.1 */
+@-o-keyframes slideright {
+  from { right: 22px; }
+  to   { right: 2px; }
+}
+
+@mixin slideright($duration) {
+  -webkit-animation: slideright $duration; /* Safari, Chrome and Opera > 12.1 */
+  -moz-animation: slideright $duration; /* Firefox < 16 */
+  -ms-animation: slideright $duration; /* Internet Explorer */
+  -o-animation: slideright $duration; /* Opera < 12.1 */
+  animation: slideright $duration;
+}
+
+@keyframes slideleft {
+  from { right: 2px; }
+  to   { right: 22px; }
+}
+
+/* Firefox < 16 */
+@-moz-keyframes slideleft {
+  from { right: 2px; }
+  to   { right: 22px; }
+}
+
+/* Safari, Chrome and Opera > 12.1 */
+@-webkit-keyframes slideleft {
+  from { right: 2px; }
+  to   { right: 22px; }
+}
+
+/* Internet Explorer */
+@-ms-keyframes slideleft {
+  from { right: 2px; }
+  to   { right: 22px; }
+}
+
+/* Opera < 12.1 */
+@-o-keyframes slideleft {
+  from { right: 2px; }
+  to   { right: 22px; }
+}
+
+@mixin slideleft($duration) {
+  -webkit-animation: slideleft $duration; /* Safari, Chrome and Opera > 12.1 */
+  -moz-animation: slideleft $duration; /* Firefox < 16 */
+  -ms-animation: slideleft $duration; /* Internet Explorer */
+  -o-animation: slideleft $duration; /* Opera < 12.1 */
+  animation: slideleft $duration;
+}
+
+
+@keyframes switchcolorred {
+  from { background-color: $background; }
+  to   { background-color: $attract; }
+}
+
+/* Firefox < 16 */
+@-moz-keyframes switchcolorred {
+  from { background-color: $background; }
+  to   { background-color: $attract; }
+}
+
+/* Safari, Chrome and Opera > 12.1 */
+@-webkit-keyframes switchcolorred {
+  from { background-color: $background; }
+  to   { background-color: $attract; }
+}
+
+/* Internet Explorer */
+@-ms-keyframes switchcolorred {
+  from { background-color: $background; }
+  to   { background-color: $attract; }
+}
+
+/* Opera < 12.1 */
+@-o-keyframes switchcolorred {
+  from { background-color: $background; }
+  to   { background-color: $attract; }
+}
+
+@mixin switchcolorred($duration) {
+  -webkit-animation: switchcolorred $duration; /* Safari, Chrome and Opera > 12.1 */
+  -moz-animation: switchcolorred $duration; /* Firefox < 16 */
+  -ms-animation: switchcolorred $duration; /* Internet Explorer */
+  -o-animation: switchcolorred $duration; /* Opera < 12.1 */
+  animation: switchcolorred $duration;
+}
+
+
+@keyframes switchcolorgray {
+  from { background-color: $attract; }
+  to   { background-color: $background; }
+}
+
+/* Firefox < 16 */
+@-moz-keyframes switchcolorgray {
+  from { background-color: $attract; }
+  to   { background-color: $background; }
+}
+
+/* Safari, Chrome and Opera > 12.1 */
+@-webkit-keyframes switchcolorgray {
+  from { background-color: $attract; }
+  to   { background-color: $background; }
+}
+
+/* Internet Explorer */
+@-ms-keyframes switchcolorgray {
+  from { background-color: $attract; }
+  to   { background-color: $background; }
+}
+
+/* Opera < 12.1 */
+@-o-keyframes switchcolorgray {
+  from { background-color: $attract; }
+  to   { background-color: $background; }
+}
+
+@mixin switchcolorgray($duration) {
+  -webkit-animation: switchcolorgray $duration; /* Safari, Chrome and Opera > 12.1 */
+  -moz-animation: switchcolorgray $duration; /* Firefox < 16 */
+  -ms-animation: switchcolorgray $duration; /* Internet Explorer */
+  -o-animation: switchcolorgray $duration; /* Opera < 12.1 */
+  animation: switchcolorgray $duration;
+}
+
+@keyframes neon {
+  0% {
+    text-shadow: -1px -1px 1px $foreground, -1px 1px 1px $foreground, 1px -1px 1px $foreground, 1px 1px 1px $foreground,
+    0 0 1px $foreground, 0 0 3px $foreground, 0 0 6px $foreground,
+    0 0 10px $light-attract, 0 0 12px $light-attract, 0 0 17px $light-attract, 0 0 19px $light-attract, 0 0 22px $light-attract, 0 0 25px $light-attract;
+  }
+  50% {
+    text-shadow: -1px -1px 1px $foreground, -1px 1px 1px $foreground, 1px -1px 1px $foreground, 1px 1px 1px $foreground,
+    0 0 5px $foreground, 0 0 5px $foreground, 0 0 7px $foreground,
+    0 0 12px $light-attract, 0 0 17px $light-attract, 0 0 20px $light-attract, 0 0 25px $light-attract, 0 0 27px $light-attract, 0 0 30px $light-attract;
+  }
+  100% {
+    text-shadow: -1px -1px 1px $foreground, -1px 1px 1px $foreground, 1px -1px 1px $foreground, 1px 1px 1px $foreground,
+    0 0 1px $foreground, 0 0 3px $foreground, 0 0 6px $foreground,
+    0 0 10px $light-attract, 0 0 12px $light-attract, 0 0 17px $light-attract, 0 0 19px $light-attract, 0 0 22px $light-attract, 0 0 25px $light-attract;
+  }
+}
+
+@keyframes heartbeat {
+  0% {
+    transform: scale( 0.925);
+  }
+  20% {
+    transform: scale( 1);
+  }
+  40% {
+    transform: scale( 0.925);
+  }
+  60% {
+    transform: scale( 1);
+  }
+  80% {
+    transform: scale( 0.925);
+  }
+  100% {
+    transform: scale( 0.925);
+  }
+}
+
+@keyframes hearts {
+  0% {
+    transform:translate(0, 0%) rotate(45deg);
+  }
+  20% { // show and hint at moving
+    opacity: 0.4;
+    transform:translate(0, -20%) rotate(45deg);
+  }
+  100% {
+    transform:translate(0, -300%) rotate(45deg); //Big hearts move faster
+  }
+}
+
+@keyframes growAndGrow {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    box-shadow: 0 0 2px 0 #ff7461; // forced light-attract all themes
+    transform: scale(1.025);
+  }
+  50% {
+    box-shadow: 0 0 4px 0 #ff7461; // forced light-attract all themes
+    transform: scale(1.05);
+  }
+  75% {
+    box-shadow: 0 0 7px 0 #ff7461; // forced light-attract all themes
+    transform: scale(1.075);
+  }
+  100% {
+    box-shadow: 0 0 12px 0 #ff7461; // forced light-attract all themes
+    transform: scale( 1.1);
+  }
+}
+
+#pct .hearts {
+  .fa {
+    z-index: 2;
+    display: inline-block;
+    position: relative;
+    &:hover {
+      text-decoration: none;
+    }
+  }
+  .btsp {
+    z-index: 2;
+    position: relative;
+    &:hover {
+      text-decoration: none;
+    }
+  }
+
+  &:focus, &.forc {
+    // animation: growAndGrow 0.2s ease-in 1 forwards;
+    background-color: $light-attract;
+    .prtcl {
+      display: block;
+    }
+  }
+  &:hover {
+    text-decoration: none;
+  }
+  .prtcls {
+    height: 100%;
+    width: 100%;
+  }
+  .prtcl {
+    animation: hearts 2s ease-in infinite;
+    background-color: #b5000d;
+    display: none;
+    opacity: 0;
+    position: absolute;
+    z-index: 1;
+
+    &:nth-of-type(1) {
+      animation-delay: 0.8s;
+      height: 8px;
+      left: 2%;
+      top: 5%;
+      width: 8px;
+    }
+    &:nth-of-type(2) {
+      animation-delay: 2.5s;
+      height: 3px;
+      left: 6%;
+      top: 55%;
+      width: 3px;
+    }
+    &:nth-of-type(3) {
+      animation-delay: 0.6s;
+      height: 12px;
+      left: 16%;
+      top: 115%;
+      width: 12px;
+    }
+    &:nth-of-type(4) {
+      animation-delay: 2.3s;
+      height: 6px;
+      left: 26%;
+      top: 80%;
+      width: 6px;
+    }
+    &:nth-of-type(5) {
+      animation-delay: 0.1s;
+      height: 4px;
+      left: 36%;
+      top: 5%;
+      width: 4px;
+    }
+    &:nth-of-type(6) {
+      animation-delay: 0.9s;
+      height: 9px;
+      left: 45%;
+      top: 55%;
+      width: 9px;
+    }
+    &:nth-of-type(7) {
+      animation-delay: 1.6s;
+      height: 10px;
+      left: 49%;
+      top: 85%;
+      width: 10px;
+    }
+    &:nth-of-type(8) {
+      animation-delay: 0.2s;
+      height: 7px;
+      left: 59%;
+      top: 100%;
+      width: 7px;
+    }
+    &:nth-of-type(9) {
+      animation-delay: 1.1s;
+      height: 11px;
+      left: 66%;
+      top: 30%;
+      width: 11px;
+    }
+    &:nth-of-type(10) {
+      animation-delay: 0.1s;
+      height: 9px;
+      left: 79%;
+      top: 95%;
+      width: 9px;
+    }
+    &:nth-of-type(11) {
+      animation-delay: 1.7s;
+      height: 9px;
+      left: 82%;
+      top: 15%;
+      width: 9px;
+    }
+    &:nth-of-type(12) {
+      animation-delay: 0.2s;
+      height: 6px;
+      left: 96%;
+      top: 0%;
+      width: 6px;
+    }
+    &:before, &:after {
+      background-color: #b5000d; // forced dark-attract all themes
+      border-radius: 100px;
+      content: '';
+      height: 100%;
+      left: 0px;
+      position: absolute;
+      top: 0px;
+      width: 100%;
+    }
+    &:before {
+      transform: translateX(-50%);
+    }
+    &:after {
+      transform: translateY(-50%);
+    }
+  }
+}
+// HEART-PROGRESS TOP H4 PERCENTAGE-PROGRESS TEXT.
+#pct .hp h4.pp-top{
+  width: 172px;
+  margin-left: -10px;
+}
+// HEART-PROGRESS BOTTOM H4 PERCENTAGE-PROGRESS TEXT.
+#pct .hp h4.pp-bottom {
+  width: 158px;
+  margin-left: -4px;
+  margin-top: -8px;
+  margin-bottom: 12px;
+}
+// HEART-PROGRESS VARIABLES.
+$heart-stroke-width: 1;// Common stroke-width.
+$heart-arrow-left-stroke-width-initial: 0;// Initial stroke-width.
+$heart-arrow-right-stroke-width-initial: 0;// Initial stroke-width.
+$heart-body-stroke-dasharray: 425;// Common stroke-dasharray for heart body.
+$heart-arrow-left-stroke-dasharray: 202;// Common stroke-dasharray for heart left arrow.
+$heart-arrow-right-stroke-dasharray: 202;// Common stroke-dasharray for heart right arrow.
+$heart-arrow-left-stroke-dasharray-initial: 202;// Initial stroke-dasharray for heart left arrow.
+$heart-arrow-right-stroke-dasharray-initial: 202;// Initial stroke-dasharray for heart right arrow.
+// MIXIN. INITIAL RULES FOR HEART-ARROW-LEFT.
+@mixin heart-left-arrow-initial {
+  stroke-dasharray: $heart-arrow-left-stroke-dasharray-initial;
+  stroke-width: $heart-arrow-left-stroke-width-initial;
+}
+// MIXIN. INITIAL RULES FOR HEART-ARROW-RIGHT.
+@mixin heart-right-arrow-initial {
+  stroke-dasharray: $heart-arrow-right-stroke-dasharray-initial;
+  stroke-width: $heart-arrow-right-stroke-width-initial;
+}
+// MIXIN. KEEPS STROKE FOR HEART BODY CONSTANT WHILE STROKE FOR HEART-LEFT-ARROW PROGRESSES.
+@mixin heart-body-317 {
+  stroke-dasharray: $heart-body-stroke-dasharray;
+  stroke-dashoffset: 317.23;
+  stroke-width: $heart-stroke-width;
+}
+// MIXIN. KEEPS STROKE FOR HEART BODY CONSTANT WHILE STROKE FOR HEART-LEFT-ARROW PROGRESSES.
+@mixin heart-body-110-02 {
+  stroke-dasharray: $heart-body-stroke-dasharray;
+  stroke-dashoffset: 110.02;
+  stroke-width: $heart-stroke-width;
+}
+// MIXIN. COMMON RULES FOR HEART-ARROW-LEFT.
+@mixin heart-left-arrow-common {
+  stroke-dasharray: $heart-arrow-left-stroke-dasharray;
+  stroke-width: $heart-stroke-width;
+}
+// MIXIN. COMMON RULES FOR HEART-ARROW-LEFT.
+@mixin heart-right-arrow-common {
+  stroke-dasharray: $heart-arrow-right-stroke-dasharray;
+  stroke-width: $heart-stroke-width;
+}
+// MIXIN. COMMON RULES FOR HEART-BODY.
+@mixin heart-body-common {
+  stroke-dasharray: $heart-body-stroke-dasharray;// $heart-body-stroke-dasharray: 425;
+  stroke-width: $heart-stroke-width;// $heart-stroke-width: 1;
+}
+// MIXIN. RULES FOR HEART-ARROW-LEFT COMPLETELY DRAWN.
+@mixin heart-left-arrow-complete {
+  @include heart-left-arrow-common;
+  stroke-dashoffset: 0;
+}
+// MIXIN. RULES FOR HEART-ARROW-RIGHT COMPLETELY DRAWN.
+@mixin heart-right-arrow-complete {
+  @include heart-right-arrow-common;
+  stroke-dashoffset: 0;
+}
+// INITIAL STATE OF LEFT-ARROW.
+#pct .hp svg g > g > g:nth-child(2) {
+  @include heart-left-arrow-initial;
+  stroke-dashoffset: 202;// Decrement by 8.29 (each time pt1 increments).
+}
+// INITIAL STATE OF RIGHT-ARROW.
+#pct .hp svg g > g > g:nth-child(3) {
+  @include heart-right-arrow-initial;
+  stroke-dashoffset: 202;// Decrement by 8.29 (each time pt1 increments).
+}
+// TOTAL stroke-dasharray: 425 (HEART BODY) + 202 (LEFT ARROW) + 202 (RIGHT ARROW) = 829;
+// HEART BODY.
+#pct .hp svg.pt0 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 425;// Decrement by 8.29 (each time pt1 increments).
+  // stroke-dashoffset: 316;// TO TAIL OF LEFT ARROW.
+}
+#pct .hp svg.pt1 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 416.41;
+}
+#pct .hp svg.pt2 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 408.42;
+}
+#pct .hp svg.pt3 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 400.13;
+}
+#pct .hp svg.pt4 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 391.84;
+}
+#pct .hp svg.pt5 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 383.55;
+}
+#pct .hp svg.pt6 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 375.26;
+}
+#pct .hp svg.pt7 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 366.97;
+}
+#pct .hp svg.pt8 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 358.68;
+}
+#pct .hp svg.pt9 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 350.39;
+}
+#pct .hp svg.pt10 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 342.1;
+}
+#pct .hp svg.pt11 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 333.81;
+}
+#pct .hp svg.pt12 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 325.25;
+}
+#pct .hp svg.pt13 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW STARTS DRAWING. TOTAL stroke-dasharray: 202;
+#pct .hp svg.pt14 g > g > g:nth-child(2) {
+  stroke-dashoffset: 193.71;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// HEART BODY.
+#pct .hp svg.pt14 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt15 g > g > g:nth-child(2) {
+  stroke-dashoffset: 185.42;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt15 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt16 g > g > g:nth-child(2) {
+  stroke-dashoffset: 177.13;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt16 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt17 g > g > g:nth-child(2) {
+  stroke-dashoffset: 168.84;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt17 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt18 g > g > g:nth-child(2) {
+  stroke-dashoffset: 160.55;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt18 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt19 g > g > g:nth-child(2) {
+  stroke-dashoffset: 152.26;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt19 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt20 g > g > g:nth-child(2) {
+  stroke-dashoffset: 143.97;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt20 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt21 g > g > g:nth-child(2) {
+  stroke-dashoffset: 135.68;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt21 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt22 g > g > g:nth-child(2) {
+  stroke-dashoffset: 127.39;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt22 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt23 g > g > g:nth-child(2) {
+  stroke-dashoffset: 119.1;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt23 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt24 g > g > g:nth-child(2) {
+  stroke-dashoffset: 110.81;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt24 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt25 g > g > g:nth-child(2) {
+  stroke-dashoffset: 102.52;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt25 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt26 g > g > g:nth-child(2) {
+  stroke-dashoffset: 94.23;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt26 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt27 g > g > g:nth-child(2) {
+  stroke-dashoffset: 85.94;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt27 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt28 g > g > g:nth-child(2) {
+  stroke-dashoffset: 77.65;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt28 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt29 g > g > g:nth-child(2) {
+  stroke-dashoffset: 69.36;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt29 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt30 g > g > g:nth-child(2) {
+  stroke-dashoffset: 61.07;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt30 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt31 g > g > g:nth-child(2) {
+  stroke-dashoffset: 52.78;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt31 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt32 g > g > g:nth-child(2) {
+  stroke-dashoffset: 44.49;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt32 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt33 g > g > g:nth-child(2) {
+  stroke-dashoffset: 36.2;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt33 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt34 g > g > g:nth-child(2) {
+  stroke-dashoffset: 27.91;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt34 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt35 g > g > g:nth-child(2) {
+  stroke-dashoffset: 19.62;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt35 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt36 g > g > g:nth-child(2) {
+  stroke-dashoffset: 11.33;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// // HEART BODY.
+#pct .hp svg.pt36 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// LEFT HEART ARROW COMPLETED STROKE.
+#pct .hp svg.pt37 g > g > g:nth-child(2) {
+  stroke-dashoffset: 0.00;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+  @include heart-left-arrow-common;
+}
+// HEART BODY.
+#pct .hp svg.pt37 g > g > g:nth-child(1) {
+  @include heart-body-317;
+}
+// HEART BODY.
+#pct .hp svg.pt38 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 308.94;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt38 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt39 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 300.65;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt39 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt40 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 292.36;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt40 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt41 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 284.07;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt41 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt42 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 275.78;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt42 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt43 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 267.49;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt43 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt44 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 259.2;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt44 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt45 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 250.91;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt45 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt46 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 242.62;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt46 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt47 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 234.33;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt47 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt48 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 226.04;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt48 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt49 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 217.75;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt49 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// 50% COMPLETE.
+// HEART BODY.
+#pct .hp svg.pt50 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 212.5;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt50 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt51 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 204.21;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt51 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt52 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 195.92;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt52 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt53 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 187.63;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt53 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt54 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 179.34;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt54 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt55 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 171.05;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt55 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt56 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 162.76;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt56 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt57 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 154.47;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt57 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt58 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 146.18;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt58 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt59 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 137.89;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt59 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt60 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 129.6;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt60 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt61 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 121.31;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt61 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt62 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 110.02;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt62 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW STARTS DRAWING. TOTAL stroke-dasharray: 202;
+#pct .hp svg.pt63 g > g > g:nth-child(3) {
+  stroke-dashoffset: 193.71;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt63 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt63 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt64 g > g > g:nth-child(3) {
+  stroke-dashoffset: 185.42;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt64 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt64 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt65 g > g > g:nth-child(3) {
+  stroke-dashoffset: 177.13;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt65 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt65 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt66 g > g > g:nth-child(3) {
+  stroke-dashoffset: 168.84;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt66 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt66 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt67 g > g > g:nth-child(3) {
+  stroke-dashoffset: 160.55;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt67 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt67 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt68 g > g > g:nth-child(3) {
+  stroke-dashoffset: 152.26;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt68 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt68 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt69 g > g > g:nth-child(3) {
+  stroke-dashoffset: 143.97;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt69 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt69 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt70 g > g > g:nth-child(3) {
+  stroke-dashoffset: 135.68;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt70 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt70 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt71 g > g > g:nth-child(3) {
+  stroke-dashoffset: 127.39;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt71 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt71 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt72 g > g > g:nth-child(3) {
+  stroke-dashoffset: 119.1;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt72 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt72 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt73 g > g > g:nth-child(3) {
+  stroke-dashoffset: 110.81;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt73 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt73 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt74 g > g > g:nth-child(3) {
+  stroke-dashoffset: 102.52;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt74 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt74 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt75 g > g > g:nth-child(3) {
+  stroke-dashoffset: 94.23;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt75 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt75 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt76 g > g > g:nth-child(3) {
+  stroke-dashoffset: 85.94;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt76 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt76 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt77 g > g > g:nth-child(3) {
+  stroke-dashoffset: 77.65;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt77 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt77 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt78 g > g > g:nth-child(3) {
+  stroke-dashoffset: 69.36;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt78 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt78 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt79 g > g > g:nth-child(3) {
+  stroke-dashoffset: 61.07;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt79 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt79 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt80 g > g > g:nth-child(3) {
+  stroke-dashoffset: 52.78;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt80 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt80 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt81 g > g > g:nth-child(3) {
+  stroke-dashoffset: 44.49;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt81 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt81 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt82 g > g > g:nth-child(3) {
+  stroke-dashoffset: 36.2;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt82 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt82 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt83 g > g > g:nth-child(3) {
+  stroke-dashoffset: 27.91;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt83 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt83 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt84 g > g > g:nth-child(3) {
+  stroke-dashoffset: 19.62;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt84 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt84 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW.
+#pct .hp svg.pt85 g > g > g:nth-child(3) {
+  stroke-dashoffset: 11.33;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt85 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt85 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt86 g > g > g:nth-child(3) {
+  stroke-dashoffset: 0.00;
+  @include heart-right-arrow-common;
+}
+// LEFT HEART ARROW.
+#pct .hp svg.pt86 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt86 g > g > g:nth-child(1) {
+  @include heart-body-110-02;
+}
+// HEART-BODY CONTINUES AFTER RIGHT-HEART-ARROW COMPLETED.
+// HEART BODY.
+#pct .hp svg.pt87 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 101.73;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt87 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt87 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt88 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 93.44;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt88 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt88 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt89 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 85.15;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt89 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt89 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt90 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 76.86;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt90 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt90 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt91 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 68.57;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt91 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt91 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt92 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 60.28;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt92 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt92 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt93 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 51.99;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt93 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt93 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt94 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 43.7;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt94 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt94 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt95 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 35.41;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt95 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt95 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt96 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 27.12;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt96 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt96 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt97 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 18.83;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt97 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt97 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt98 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 10.54;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt98 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt98 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt99 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 5.25;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt99 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// RIGHT HEART ARROW. RIGHT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt99 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+// HEART BODY.
+#pct .hp svg.pt100 g > g > g:nth-child(1) {
+  @include heart-body-common;
+  stroke-dashoffset: 0.00;// Decrement by 8.29 starting from 202 until 0 to get drawing effect.
+}
+// LEFT HEART ARROW. LEFT-HEART-ARROW COMPLETED.
+#pct .hp svg.pt100 g > g > g:nth-child(2) {
+  @include heart-left-arrow-complete;
+}
+// SCSS FOR HEART-PROGRESS FILL:
+// HEART SVG IS COMPLETELY OPAQUE THROUGHOUT PROGRESS.
+#pct .hp svg g {
+    fill-opacity: 0;
+}
+#pct .hp svg.pt100 g > g > g:nth-child(3) {
+  @include heart-right-arrow-complete;
+}
+
+// CONDITION: IF INFINITE, KEEP DRAWING THE HEART-PROGRESS FOR INFINITE.
+#pct .hp svg.infinite g > g > g:nth-child(1) {
+  animation: heartbodycommon 0.5s ease-in infinite;
+}
+#pct .hp svg.infinite g > g > g:nth-child(2) {
+  animation: heartprogressleftarrow 0.5s ease-in infinite;
+}
+#pct .hp svg.infinite g > g > g:nth-child(3) {
+  animation: heartprogressrightarrow 0.5s ease-in infinite;
+}
+
+// @mixin heart-body-common {
+//   stroke-dasharray: $heart-body-stroke-dasharray;// $heart-body-stroke-dasharray: 425;
+//   stroke-width: $heart-stroke-width;// $heart-stroke-width: 1;
+// }
+@keyframes heartbodycommon {
+  0% { @include heart-body-common; stroke-dashoffset: 425;}
+  1% { @include heart-body-common; stroke-dashoffset: 416.41;}
+  2% { @include heart-body-common; stroke-dashoffset: 408.42;}
+  3% { @include heart-body-common; stroke-dashoffset: 400.13;}
+  4% { @include heart-body-common; stroke-dashoffset: 391.84;}
+  5% { @include heart-body-common; stroke-dashoffset: 383.55;}
+  6% { @include heart-body-common; stroke-dashoffset: 375.26;}
+  7% { @include heart-body-common; stroke-dashoffset: 366.97;}
+  8% { @include heart-body-common; stroke-dashoffset: 358.68;}
+  9% { @include heart-body-common; stroke-dashoffset: 350.39;}
+  10% { @include heart-body-common; stroke-dashoffset: 342.1;}
+  11% { @include heart-body-common; stroke-dashoffset: 333.81;}
+  12% { @include heart-body-common; stroke-dashoffset: 325.25;}
+  13% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  14% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  15% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  16% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  17% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  18% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  19% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  20% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  21% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  22% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  23% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  24% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  25% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  26% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  27% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  28% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  29% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  30% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  31% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  32% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  33% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  34% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  35% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  36% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  37% { @include heart-body-common; stroke-dashoffset: 317.23;}
+  38% { @include heart-body-common; stroke-dashoffset: 308.94;}
+  39% { @include heart-body-common; stroke-dashoffset: 300.65;}
+  40% { @include heart-body-common; stroke-dashoffset: 292.36;}
+  41% { @include heart-body-common; stroke-dashoffset: 284.07;}
+  42% { @include heart-body-common; stroke-dashoffset: 275.78;}
+  43% { @include heart-body-common; stroke-dashoffset: 267.49;}
+  44% { @include heart-body-common; stroke-dashoffset: 259.2;}
+  45% { @include heart-body-common; stroke-dashoffset: 250.91;}
+  46% { @include heart-body-common; stroke-dashoffset: 242.62;}
+  47% { @include heart-body-common; stroke-dashoffset: 234.33;}
+  48% { @include heart-body-common; stroke-dashoffset: 226.04;}
+  49% { @include heart-body-common; stroke-dashoffset: 217.75;}
+  50% { @include heart-body-common; stroke-dashoffset: 212.5;}
+  51% { @include heart-body-common; stroke-dashoffset: 204.21;}
+  52% { @include heart-body-common; stroke-dashoffset: 195.92;}
+  53% { @include heart-body-common; stroke-dashoffset: 187.63;}
+  54% { @include heart-body-common; stroke-dashoffset: 179.34;}
+  55% { @include heart-body-common; stroke-dashoffset: 171.05;}
+  56% { @include heart-body-common; stroke-dashoffset: 162.76;}
+  57% { @include heart-body-common; stroke-dashoffset: 154.47;}
+  58% { @include heart-body-common; stroke-dashoffset: 146.18;}
+  59% { @include heart-body-common; stroke-dashoffset: 137.89;}
+  60% { @include heart-body-common; stroke-dashoffset: 129.6;}
+  61% { @include heart-body-common; stroke-dashoffset: 121.31;}
+  62% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  63% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  64% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  65% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  66% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  67% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  68% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  69% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  70% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  71% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  72% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  73% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  74% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  75% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  76% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  77% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  78% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  79% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  80% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  81% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  82% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  83% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  84% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  85% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  86% { @include heart-body-common; stroke-dashoffset: 110.02;}
+  87% { @include heart-body-common; stroke-dashoffset: 101.73}
+  88% { @include heart-body-common; stroke-dashoffset: 93.44;}
+  89% { @include heart-body-common; stroke-dashoffset: 85.15;}
+  90% { @include heart-body-common; stroke-dashoffset: 76.86;}
+  91% { @include heart-body-common; stroke-dashoffset: 68.57;}
+  92% { @include heart-body-common; stroke-dashoffset: 60.28;}
+  93% { @include heart-body-common; stroke-dashoffset: 51.99;}
+  94% { @include heart-body-common; stroke-dashoffset: 43.7;}
+  95% { @include heart-body-common; stroke-dashoffset: 35.41;}
+  96% { @include heart-body-common; stroke-dashoffset: 27.12;}
+  97% { @include heart-body-common; stroke-dashoffset: 18.83;}
+  98% { @include heart-body-common; stroke-dashoffset: 10.54;}
+  99% { @include heart-body-common; stroke-dashoffset: 5.25;}
+  100% { @include heart-body-common; stroke-dashoffset: 0.00;}
+}
+@keyframes heartprogressleftarrow {
+  0% { @include heart-left-arrow-initial; }
+  1% { @include heart-left-arrow-initial; }
+  2% { @include heart-left-arrow-initial; }
+  3% { @include heart-left-arrow-initial; }
+  4% { @include heart-left-arrow-initial; }
+  5% { @include heart-left-arrow-initial; }
+  6% { @include heart-left-arrow-initial; }
+  7% { @include heart-left-arrow-initial; }
+  8% { @include heart-left-arrow-initial; }
+  9% { @include heart-left-arrow-initial; }
+  10% { @include heart-left-arrow-initial; }
+  11% { @include heart-left-arrow-initial; }
+  12% { @include heart-left-arrow-initial; }
+  13% { @include heart-left-arrow-initial; }
+  14% { @include heart-left-arrow-common; stroke-dashoffset: 193.71;}
+  15% { @include heart-left-arrow-common; stroke-dashoffset: 185.42;}
+  16% { @include heart-left-arrow-common; stroke-dashoffset: 177.13;}
+  17% { @include heart-left-arrow-common; stroke-dashoffset: 168.84;}
+  18% { @include heart-left-arrow-common; stroke-dashoffset: 160.55;}
+  19% { @include heart-left-arrow-common; stroke-dashoffset: 152.26;}
+  20% { @include heart-left-arrow-common; stroke-dashoffset: 143.97;}
+  21% { @include heart-left-arrow-common; stroke-dashoffset: 135.68;}
+  22% { @include heart-left-arrow-common; stroke-dashoffset: 127.39;}
+  23% { @include heart-left-arrow-common; stroke-dashoffset: 119.1;}
+  24% { @include heart-left-arrow-common; stroke-dashoffset: 110.81;}
+  25% { @include heart-left-arrow-common; stroke-dashoffset: 102.52;}
+  26% { @include heart-left-arrow-common; stroke-dashoffset: 94.23;}
+  27% { @include heart-left-arrow-common; stroke-dashoffset: 85.94;}
+  28% { @include heart-left-arrow-common; stroke-dashoffset: 77.65;}
+  29% { @include heart-left-arrow-common; stroke-dashoffset: 69.36;}
+  30% { @include heart-left-arrow-common; stroke-dashoffset: 61.07;}
+  31% { @include heart-left-arrow-common; stroke-dashoffset: 52.78;}
+  32% { @include heart-left-arrow-common; stroke-dashoffset: 44.49;}
+  33% { @include heart-left-arrow-common; stroke-dashoffset: 36.2;}
+  34% { @include heart-left-arrow-common; stroke-dashoffset: 27.91;}
+  35% { @include heart-left-arrow-common; stroke-dashoffset: 19.62;}
+  36% { @include heart-left-arrow-common; stroke-dashoffset: 11.33;}
+  37% { @include heart-left-arrow-common; stroke-dashoffset: 0.00;}
+  38% { @include heart-left-arrow-complete; }
+  39% { @include heart-left-arrow-complete; }
+  40% { @include heart-left-arrow-complete; }
+  41% { @include heart-left-arrow-complete; }
+  42% { @include heart-left-arrow-complete; }
+  43% { @include heart-left-arrow-complete; }
+  44% { @include heart-left-arrow-complete; }
+  45% { @include heart-left-arrow-complete; }
+  46% { @include heart-left-arrow-complete; }
+  47% { @include heart-left-arrow-complete; }
+  48% { @include heart-left-arrow-complete; }
+  49% { @include heart-left-arrow-complete; }
+  50% { @include heart-left-arrow-complete; }
+  51% { @include heart-left-arrow-complete; }
+  52% { @include heart-left-arrow-complete; }
+  53% { @include heart-left-arrow-complete; }
+  54% { @include heart-left-arrow-complete; }
+  55% { @include heart-left-arrow-complete; }
+  56% { @include heart-left-arrow-complete; }
+  57% { @include heart-left-arrow-complete; }
+  58% { @include heart-left-arrow-complete; }
+  59% { @include heart-left-arrow-complete; }
+  60% { @include heart-left-arrow-complete; }
+  61% { @include heart-left-arrow-complete; }
+  62% { @include heart-left-arrow-complete; }
+  63% { @include heart-left-arrow-complete; }
+  64% { @include heart-left-arrow-complete; }
+  65% { @include heart-left-arrow-complete; }
+  66% { @include heart-left-arrow-complete; }
+  67% { @include heart-left-arrow-complete; }
+  68% { @include heart-left-arrow-complete; }
+  69% { @include heart-left-arrow-complete; }
+  70% { @include heart-left-arrow-complete; }
+  71% { @include heart-left-arrow-complete; }
+  72% { @include heart-left-arrow-complete; }
+  73% { @include heart-left-arrow-complete; }
+  74% { @include heart-left-arrow-complete; }
+  75% { @include heart-left-arrow-complete; }
+  76% { @include heart-left-arrow-complete; }
+  77% { @include heart-left-arrow-complete; }
+  78% { @include heart-left-arrow-complete; }
+  79% { @include heart-left-arrow-complete; }
+  80% { @include heart-left-arrow-complete; }
+  81% { @include heart-left-arrow-complete; }
+  82% { @include heart-left-arrow-complete; }
+  83% { @include heart-left-arrow-complete; }
+  84% { @include heart-left-arrow-complete; }
+  85% { @include heart-left-arrow-complete; }
+  86% { @include heart-left-arrow-complete; }
+  87% { @include heart-left-arrow-complete; }
+  88% { @include heart-left-arrow-complete; }
+  89% { @include heart-left-arrow-complete; }
+  90% { @include heart-left-arrow-complete; }
+  91% { @include heart-left-arrow-complete; }
+  92% { @include heart-left-arrow-complete; }
+  93% { @include heart-left-arrow-complete; }
+  94% { @include heart-left-arrow-complete; }
+  95% { @include heart-left-arrow-complete; }
+  96% { @include heart-left-arrow-complete; }
+  97% { @include heart-left-arrow-complete; }
+  98% { @include heart-left-arrow-complete; }
+  99% { @include heart-left-arrow-complete; }
+  100% { @include heart-left-arrow-complete; }
+}
+@keyframes heartprogressrightarrow {
+  0% { @include heart-right-arrow-initial; }
+  1% { @include heart-right-arrow-initial; }
+  2% { @include heart-right-arrow-initial; }
+  3% { @include heart-right-arrow-initial; }
+  4% { @include heart-right-arrow-initial; }
+  5% { @include heart-right-arrow-initial; }
+  6% { @include heart-right-arrow-initial; }
+  7% { @include heart-right-arrow-initial; }
+  8% { @include heart-right-arrow-initial; }
+  9% { @include heart-right-arrow-initial; }
+  10% { @include heart-right-arrow-initial; }
+  11% { @include heart-right-arrow-initial; }
+  12% { @include heart-right-arrow-initial; }
+  13% { @include heart-right-arrow-initial; }
+  14% { @include heart-right-arrow-initial; }
+  15% { @include heart-right-arrow-initial; }
+  16% { @include heart-right-arrow-initial; }
+  17% { @include heart-right-arrow-initial; }
+  18% { @include heart-right-arrow-initial; }
+  19% { @include heart-right-arrow-initial; }
+  20% { @include heart-right-arrow-initial; }
+  21% { @include heart-right-arrow-initial; }
+  22% { @include heart-right-arrow-initial; }
+  23% { @include heart-right-arrow-initial; }
+  24% { @include heart-right-arrow-initial; }
+  25% { @include heart-right-arrow-initial; }
+  26% { @include heart-right-arrow-initial; }
+  27% { @include heart-right-arrow-initial; }
+  28% { @include heart-right-arrow-initial; }
+  29% { @include heart-right-arrow-initial; }
+  30% { @include heart-right-arrow-initial; }
+  31% { @include heart-right-arrow-initial; }
+  32% { @include heart-right-arrow-initial; }
+  33% { @include heart-right-arrow-initial; }
+  34% { @include heart-right-arrow-initial; }
+  35% { @include heart-right-arrow-initial; }
+  36% { @include heart-right-arrow-initial; }
+  37% { @include heart-right-arrow-initial; }
+  38% { @include heart-right-arrow-initial; }
+  39% { @include heart-right-arrow-initial; }
+  40% { @include heart-right-arrow-initial; }
+  41% { @include heart-right-arrow-initial; }
+  42% { @include heart-right-arrow-initial; }
+  43% { @include heart-right-arrow-initial; }
+  44% { @include heart-right-arrow-initial; }
+  45% { @include heart-right-arrow-initial; }
+  46% { @include heart-right-arrow-initial; }
+  47% { @include heart-right-arrow-initial; }
+  48% { @include heart-right-arrow-initial; }
+  49% { @include heart-right-arrow-initial; }
+  50% { @include heart-right-arrow-initial; }
+  51% { @include heart-right-arrow-initial; }
+  52% { @include heart-right-arrow-initial; }
+  53% { @include heart-right-arrow-initial; }
+  54% { @include heart-right-arrow-initial; }
+  55% { @include heart-right-arrow-initial; }
+  56% { @include heart-right-arrow-initial; }
+  57% { @include heart-right-arrow-initial; }
+  58% { @include heart-right-arrow-initial; }
+  59% { @include heart-right-arrow-initial; }
+  60% { @include heart-right-arrow-initial; }
+  61% { @include heart-right-arrow-initial; }
+  62% { @include heart-right-arrow-initial; }
+  63% { @include heart-right-arrow-common; stroke-dashoffset: 193.71;}
+  64% { @include heart-right-arrow-common; stroke-dashoffset: 185.42;}
+  65% { @include heart-right-arrow-common; stroke-dashoffset: 177.13;}
+  66% { @include heart-right-arrow-common; stroke-dashoffset: 168.84;}
+  67% { @include heart-right-arrow-common; stroke-dashoffset: 160.55;}
+  68% { @include heart-right-arrow-common; stroke-dashoffset: 152.26;}
+  69% { @include heart-right-arrow-common; stroke-dashoffset: 143.97;}
+  70% { @include heart-right-arrow-common; stroke-dashoffset: 135.68;}
+  71% { @include heart-right-arrow-common; stroke-dashoffset: 127.39;}
+  72% { @include heart-right-arrow-common; stroke-dashoffset: 119.1;}
+  73% { @include heart-right-arrow-common; stroke-dashoffset: 110.81;}
+  74% { @include heart-right-arrow-common; stroke-dashoffset: 102.52;}
+  75% { @include heart-right-arrow-common; stroke-dashoffset: 94.23;}
+  76% { @include heart-right-arrow-common; stroke-dashoffset: 85.94;}
+  77% { @include heart-right-arrow-common; stroke-dashoffset: 77.65;}
+  78% { @include heart-right-arrow-common; stroke-dashoffset: 69.36;}
+  79% { @include heart-right-arrow-common; stroke-dashoffset: 61.07;}
+  80% { @include heart-right-arrow-common; stroke-dashoffset: 52.78;}
+  81% { @include heart-right-arrow-common; stroke-dashoffset: 44.49;}
+  82% { @include heart-right-arrow-common; stroke-dashoffset: 36.2;}
+  83% { @include heart-right-arrow-common; stroke-dashoffset: 27.91;}
+  84% { @include heart-right-arrow-common; stroke-dashoffset: 19.62;}
+  85% { @include heart-right-arrow-common; stroke-dashoffset: 11.33;}
+  86% { @include heart-right-arrow-common; stroke-dashoffset: 0.00;}
+  87% { @include heart-right-arrow-complete; }
+  88% { @include heart-right-arrow-complete; }
+  89% { @include heart-right-arrow-complete; }
+  90% { @include heart-right-arrow-complete; }
+  91% { @include heart-right-arrow-complete; }
+  92% { @include heart-right-arrow-complete; }
+  93% { @include heart-right-arrow-complete; }
+  94% { @include heart-right-arrow-complete; }
+  95% { @include heart-right-arrow-complete; }
+  96% { @include heart-right-arrow-complete; }
+  97% { @include heart-right-arrow-complete; }
+  98% { @include heart-right-arrow-complete; }
+  99% { @include heart-right-arrow-complete; }
+  100% { @include heart-right-arrow-complete; }
+}

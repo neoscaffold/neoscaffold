@@ -1,0 +1,344 @@
+#pct.shc {
+  .sgmt {
+    padding: 0 20px;
+    .sg {
+      max-width: 400px;
+      margin: 0 auto;
+      height: initial;
+      button.sgb {
+        padding: 10px;
+      }
+    }
+    .mc {
+      img {
+        max-height: 100%;
+      }
+    }
+  }
+  .hero {
+    position: relative;
+    background-color: inherit;
+    p {
+      // font-family: $heading;
+      line-height: 30px;
+    }
+    .hearts.forc {
+      background-color: $attract;
+      color: $background;
+    }
+    b {
+      color: $attract;
+    }
+    a {
+      text-decoration: none;
+    }
+    .cta, .cta2 {
+      display: inline-block;
+
+      button.hearts {
+        background-color: $attract;
+        color: $background;
+        &:hover {
+          background-color: $light-attract;
+
+        }
+      }
+    }
+    .cta2 {
+      margin-left: 20px;
+      &:hover {
+        color: $attract;
+      }
+    }
+  }
+  .vps {
+    p {
+      line-height: 30px;
+    }
+    .tb {
+      text-align: center;
+    }
+    a {
+      display: inline-block;
+    }
+    img {
+      max-width: 50dvw;
+    }
+  }
+  .fx {
+    .fa-op {
+      font-size: 40px;
+      display: block;
+      margin: 0;
+    }
+    .cn img {
+      border-radius: 50%;
+      display: block;
+      margin: 0 auto;
+    }
+  }
+  .expd {
+    cursor: pointer;
+    touch-action: manipulation;
+    -ms-touch-action: manipulation;
+    .fa-angle-up, .fa-angle-down {
+      font-size: 44px;
+    }
+  }
+  .exps {
+    background-color: $background;
+    height: 0;
+    overflow: hidden;
+    transition: height 0.3s ease-out 0s;
+  }
+  .bnr {
+    display: block;
+    margin: 0 auto;
+    max-height: 640px;
+    object-fit: cover;
+    width: 100%;
+  }
+  .smimg {
+    border-radius: 10px;
+    display: block;
+    height: 300px;
+    margin: 20px;
+    max-height: 100%;
+    object-fit: cover;
+  }
+  .vcn {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+  }
+  .flnk {
+    a {
+      color: $attract;
+      text-decoration: underline;
+    }
+  }
+  // https://css-tricks.com/snippets/css/complete-guide-grid/
+  .grdct {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: 200px 200px 200px;
+    justify-content: center;
+  }
+  .grdit {
+    img {
+      background-color: $text;
+      display: block;
+      margin: 0 auto;
+      height: 200px;
+    }
+  }
+  .f-t {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+
+    button {
+      margin: auto !important;
+    }
+  }
+
+  .crsl {
+    position: relative;
+  }
+
+  .crsl-inner {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    height: 20dvh;
+  }
+
+  .crsl-open:checked+.crsl-item {
+    position: static;
+    opacity: 100;
+    background-size: 100% auto;
+    background-repeat: no-repeat;
+    background-position-x: center;
+  }
+
+  .crsl-item {
+    position: absolute;
+    opacity: 0;
+    height: inherit;
+  }
+
+  .crsl-item img {
+    display: block;
+    height: auto;
+    max-width: 100%;
+    max-height: 40dvh;
+  }
+
+  .crsl-control {
+    color: $text;
+    background: $copy;
+    border-radius: 50%;
+    cursor: pointer;
+    display: none;
+    font-size: 40px;
+    height: 40px;
+    line-height: 35px;
+    position: absolute;
+    top: 50%;
+    -webkit-transform: translate(0, -50%);
+    -ms-transform: translate(0, -50%);
+    transform: translate(0, -50%);
+    text-align: center;
+    width: 40px;
+    z-index: 10;
+
+    .fa-angle-right {
+      margin: -2px 0 0 4px;
+    }
+
+    .fa-angle-left {
+      margin: -2px 4px 0 0;
+    }
+  }
+
+  .crsl-control.prev {
+    left: 2%;
+  }
+
+  .crsl-control.next {
+    right: 2%;
+  }
+
+  .crsl-control:hover {
+    background: $light-attract;
+  }
+
+  #crsl-1:checked~.control-1,
+  #crsl-2:checked~.control-2,
+  #crsl-3:checked~.control-3,
+  #crsl-4:checked~.control-4,
+  #crsl-5:checked~.control-5,
+  #crsl-6:checked~.control-6,
+  #crsl-7:checked~.control-7,
+  #crsl-8:checked~.control-8,
+  #crsl-9:checked~.control-9,
+  #crsl-10:checked~.control-10 {
+    display: block;
+  }
+
+  .crsl-indicators {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    position: absolute;
+    bottom: -20px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    z-index: 10;
+  }
+
+  .crsl-indicators li {
+    display: inline-block;
+    margin: 0 5px;
+    line-height: 0;
+  }
+
+  .crsl-bullet {
+    font-family: $attention;
+    cursor: pointer;
+    display: block;
+    font-size: 35px;
+  }
+
+  #crsl-1:checked~.control-1~.crsl-indicators li:nth-child(1) .crsl-bullet,
+  #crsl-2:checked~.control-2~.crsl-indicators li:nth-child(2) .crsl-bullet,
+  #crsl-3:checked~.control-3~.crsl-indicators li:nth-child(3) .crsl-bullet,
+  #crsl-4:checked~.control-4~.crsl-indicators li:nth-child(4) .crsl-bullet,
+  #crsl-5:checked~.control-5~.crsl-indicators li:nth-child(5) .crsl-bullet,
+  #crsl-6:checked~.control-6~.crsl-indicators li:nth-child(6) .crsl-bullet,
+  #crsl-7:checked~.control-7~.crsl-indicators li:nth-child(7) .crsl-bullet,
+  #crsl-8:checked~.control-8~.crsl-indicators li:nth-child(8) .crsl-bullet,
+  #crsl-9:checked~.control-9~.crsl-indicators li:nth-child(9) .crsl-bullet,
+  #crsl-10:checked~.control-10~.crsl-indicators li:nth-child(10) .crsl-bullet {
+    color: $attract;
+  }
+
+  .center {
+    left: 50%;
+    width: 70%;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .opt {
+    h3 {
+      line-height: 30px;
+    }
+    p {
+      line-height: 30px;
+      margin-top: 0;
+    }
+    img {
+      margin-bottom: 10px;
+    }
+  }
+
+  .b-s {
+    position: absolute;
+    top: 50%;
+    transform: translate(0, -50%);
+    background: rgba(255,255,255,0.8);
+    padding: 20px;
+
+    button {
+      margin: 10px;
+    }
+
+    .wf {
+      img {
+        max-height: 530px !important;
+      }
+    }
+
+    h2 {
+      font-family: $words;
+      margin: 0 10px;
+      text-align: left;
+      font-size: 30px;
+      line-height: 40px;
+    }
+
+    h4 {
+      font-family: $words;
+      margin: 10px 0 10px 10px;
+      text-align: left;
+      line-height: 15px;
+      overflow: visible;
+    }
+
+    .bgp {
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+
+      a {
+        text-decoration: none;
+      }
+
+      button.color {
+        background-color: $attract;
+        cursor: pointer;
+        font-weight: 600;
+        padding: 10px 20px;
+        transition: all 0.3s ease-in-out;
+        white-space: nowrap;
+
+        &:hover {
+          background-color: $light-attract;
+        }
+      }
+    }
+  }
+}

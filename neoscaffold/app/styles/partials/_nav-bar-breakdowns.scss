@@ -1,0 +1,17 @@
+@media (min-width: ($mobile-1 + 1)) {
+  .wf {
+    .tb.cn {
+      text-align: center;
+      img {
+        display: none;
+      }
+      .ti {
+        display: block;
+      }
+    }
+  }
+  .nbr {
+    height: calc(49px + env(safe-area-inset-top, 0));
+    position: relative;
+  }
+}

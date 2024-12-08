@@ -1,0 +1,30 @@
+@mixin inline-vertical-middle {
+  display: inline-block;
+  vertical-align: middle;
+}
+@mixin inline-vertical-top {
+  display: inline-block;
+  vertical-align: top;
+}
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+// @mixin papery-shadow { // old design with shadows for depth
+//   border-radius: 4px;
+//   box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
+// }
+@mixin papery-shadow {
+  border-radius: 0;
+  border: solid 2px $attract;
+}
+@mixin round-scrollbar {
+  ::-webkit-scrollbar {
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    background-color: $background;
+  }
+}

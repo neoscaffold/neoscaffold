@@ -1,0 +1,19 @@
+[project]
+name = "server"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ag2[cerebras]>=0.4",
+    "aiofiles>=24.1.0",
+    "aiohttp>=3.11.7",
+    "aiojobs>=1.3.0",
+    "cerebras-cloud-sdk>=1.12.1",
+    "google-auth>=2.36.0",
+    "mashumaro>=3.15",
+    "networkx>=3.4.2",
+    "pillow>=11.0.0",
+    "requests>=2.32.3",
+    "types-requests>=2.32.0.20241016",
+]

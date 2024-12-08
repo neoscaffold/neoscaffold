@@ -1,0 +1,10 @@
+.ember-notify-default .ember-notify {
+  background-color: $foreground;
+}
+
+.ember-notify-default.ember-notify-cn {
+  bottom: 49px;
+  -webkit-transform: translate3d(0,0,1px);
+  transform: translate3d(0,0,1px);
+  z-index: 10005;
+}

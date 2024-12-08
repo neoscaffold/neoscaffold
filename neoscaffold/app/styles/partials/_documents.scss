@@ -1,0 +1,22 @@
+#pct {
+  div.dc {
+    background-color: $foreground;
+    display: block;
+    line-height: 30px;
+    margin: 0 auto;
+    max-width: $desktop-1;
+    overflow: hidden;
+    padding: 20px;
+    position: relative;
+    width: calc( 80% - 40px);
+    .prv {
+      float: left;
+    }
+    .nxt {
+      float: right;
+    }
+    *:not(.i) {
+      text-align: left !important;
+    }
+  }
+}

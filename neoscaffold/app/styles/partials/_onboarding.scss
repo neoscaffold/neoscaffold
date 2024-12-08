@@ -1,0 +1,93 @@
+#pct.ob {
+  top: 0;
+  height: 100dvh;
+  width: 100%;
+  margin: 0;
+  padding: 0px;
+  text-align: center;
+  z-index: 10004;
+  .liquid-child {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    justify-content: center;
+    margin: 0;
+    overflow: visible;
+  }
+  img {
+    margin: 0 auto;
+    max-height: 100%;
+    max-width: 100%;
+  }
+  /*flex height container*/
+  .fh {
+    flex: 1 0 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    // &:last-child() {
+    //   min-height: 306px;
+    // }
+    & > .fh {
+      &:first-child {
+        // The chat window should take up whatever space it can above
+        //   the bottom half of the page (223px), and not including
+        //   the header and footer bars on ios
+        max-height: calc(50dvh - 40px - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0))
+      }
+      &:last-child {
+        min-height: 223px;
+      }
+      & > .fh {
+        min-height: unset;
+        max-height: unset;
+        flex-direction: row;
+        button {
+          line-height: 1.15em;
+          margin: 0 0 0 10px;
+          max-height: calc(20px + 1.15em);
+          width: 100%;
+          &:last-child {
+            margin-right: 10px;
+          }
+        }
+      }
+
+    }
+  }
+  /* flex slide */
+  .fsl {
+    padding-top: calc(50px + env(safe-area-inset-top, 0));
+    // overflow-y: scroll; // NEVER USE THIS IT BREAKS GESTURES!
+  }
+  /* flex image container for slide */
+  .fsc {
+    background: $text;
+    border-radius: 20px;
+    display: flex;
+    flex: calc(50% - 40px) 0 0;
+    margin: 20px;
+    text-align: center;
+    width: calc(100% - 40px);
+  }
+  div.mse {
+    div.ems-progress {
+      position: fixed;
+      top: calc(100dvh - (50px + env(safe-area-inset-bottom, 0px)));
+      width: 100%;
+      z-index: 10005;
+    }
+  }
+
+  div.chat-pnl .cht {
+    max-height: calc(34dvh - 70px);
+  }
+
+  h1, h2 {
+    margin: 0 20px;
+    overflow: visible;
+  }
+  button.wd {
+    font-size: 20px;
+  }
+}

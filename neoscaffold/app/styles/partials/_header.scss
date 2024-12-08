@@ -1,0 +1,102 @@
+header {
+  background-color: $foreground;
+  min-height: 50px;
+  top: 0;
+  width: 100%;
+  z-index: 10;
+  span.i {
+    top: 50px !important;
+  }
+  &> :nth-child(2){
+    padding-left: 100px;
+  }
+  a {
+    color: $text;
+  }
+  > * {
+    @include inline-vertical-middle;
+  }
+  > a nav, #more {
+    @include height-line-height(50px);
+    margin-right: 10px;
+  }
+  #logo {
+    vertical-align: top;
+    .index {
+      img {
+        height: 50px;
+        position: absolute;
+      }
+    }
+  }
+  #location {
+    @include height-line-height(50px);
+    margin: 0 10px;
+    padding: 0 10px;
+  }
+  #more {
+    color: $text;
+    cursor: pointer;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  #preferences {
+    float: right;
+    > * {
+      @include inline-vertical-middle;
+      margin-right: 10px;
+    }
+    #account {
+      line-height: 25px;
+      .fa-arrow-right-to-bracket { margin-right: 4px; }
+      .signout {
+        line-height: 50px;
+      }
+    }
+    .side-menu-toggle {
+      color: $text;
+      #hamburger {
+        display: none;
+      }
+    }
+    #search {
+      color: $text;
+      height:50px;
+      form > input {
+        border: none;
+        font-family: $words;
+        font-size:16px;
+        height: 30px;
+        margin-top: 10px;
+        padding: 0 4px;
+        width: 14dvw;
+      }
+      #search-ovrly {
+        background-color: rgba(0,0,0,0);
+        border: none;
+        color: transparent;
+        height: 21px;
+        margin-left: -20px;
+        margin-top: -1px;
+        position: absolute;
+        width: 20px;
+      }
+    }
+    .content-backdrop {
+      margin-right: 0;
+    }
+  }
+  .fa.fa-user {
+    margin-left: 2px;
+    margin-right: 10px;
+  }
+  .x {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    .fa {
+      margin-right: 0px;
+    }
+  }
+}

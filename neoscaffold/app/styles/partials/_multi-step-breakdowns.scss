@@ -1,0 +1,43 @@
+@media ( max-width: $mobile-1 ) {
+  #pct {
+    div.mse {
+      div.ems-progress {
+        bottom: 20px;
+        left: 0;
+        pointer-events: none;
+        position: fixed;
+        text-align: center !important;
+        width: 100%;
+        z-index: 3;
+        .mse-num {
+          background-color: $attract;
+          font-size: 0;
+          margin: 0;
+          padding: 10px;
+          pointer-events: auto;
+          position: relative;
+          &:before {
+            background-color: $text;
+            border-radius: 10px;
+            content: "";
+            height: 10px;
+            left: 5px;
+            opacity: 0.5;
+            position: absolute;
+            top: 5px;
+            width: 10px;
+          }
+          &.active {
+            background-color: $attract;
+            &:before {
+              background-color: $text;
+              opacity: 1;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+// #pct .mse .ems-progress .mse-num.active
+// #pct .mse .ems-progress .mse-num

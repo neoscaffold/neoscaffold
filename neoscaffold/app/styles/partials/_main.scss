@@ -1,0 +1,133 @@
+body {
+  background-color: $foreground;
+  color: $copy;
+  min-height: 100dvh;
+}
+a {
+  color: $copy;
+  cursor: pointer;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+body,button,label {
+  font-family: $words;
+  margin: 0px;
+}
+span.i {
+  overflow: hidden;
+  position: absolute;
+  height: 1px;
+  width: 1px;
+  z-index: 100;
+}
+div, a, nav, input, textarea, img {
+  &:hover > span.i, &:hover > * > span.i {
+    @include fade(0.4s);
+    background-color: $foreground;
+    color: $copy;
+    font-size: 18px;
+    height: 49px;
+    left: 0px;
+    line-height: 49px;
+    position: fixed;
+    text-align: center;
+    top: 0;
+    width: 100%;
+  }
+}
+h1,h2,h3,h4,h5,h6 {
+  font-family: $attention;
+  margin: 0 auto;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+}
+h1 { font-size: 2em; }
+h2 { font-size: 1.5em; }
+h3 { font-size: 1.17em; }
+h4 { font-size: 1em; }
+h5 { font-size: 0.83em; }
+h6 { font-size: 0.67em; }
+
+menu {
+  margin-block-end: 0;
+  margin-block-start: 0;
+  margin-inline-end: 0;
+  margin-inline-start: 0;
+  margin: 0;
+}
+textarea {
+  -webkit-appearance: none;
+  -moz-appearance:    none;
+  appearance:         none;
+  // ios fix
+  border-radius: 0;
+}
+.ns { //no select
+  -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Chrome/Safari/Opera */
+     -khtml-user-select: none; /* Konqueror */
+       -moz-user-select: none; /* Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  not supported by any browser */
+}
+
+/* Corber Additions */
+[data-ember-action] {
+  cursor: pointer;
+}
+
+button, a {
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
+  cursor: pointer;
+}
+
+#pct input:-webkit-autofill, textarea:-webkit-autofill, select:-webkit-autofill {
+  background-color: white;
+}
+
+/* full width reset
+ *
+ * this class with take any element in a limited width container that
+ * is centered in the window, and make it full width of the whole window
+ */
+.fwr {
+  left: 50%;
+  margin-left: -50dvw;
+  margin-right: -50dvw;
+  position: relative;
+  right: 50%;
+  width: 100dvw;
+}
+
+.liquid-container {
+  background-color: $background;
+  overflow: visible;
+  z-index: 10002;
+}
+.liquid-child {
+  overflow: visible;
+}
+body .ember-view > .liquid-container {
+  min-height: calc(100dvh - (50px + env(safe-area-inset-top, 0) + env(safe-area-inset-bottom, 0)));
+}
+
+.ember-basic-dropdown-content {
+  z-index: 100000;
+}
+
+.fa-spinner {
+  display: block;
+  margin: 20px auto 0 auto;
+  &.nt {
+    display: inline-block;
+    margin: 5px;
+  }
+}
+.ember-notify-default.ember-notify-cn {
+  background-color: $foreground;
+  color: $attract;
+}

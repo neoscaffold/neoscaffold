@@ -1,0 +1,43 @@
+footer {
+  background-color: $background;
+  color: $copy;
+  padding: 10px;
+  a {
+    color: $text;
+  }
+  nav {
+    @include inline-vertical-middle;
+    color: $text;
+    font-size: 18px;
+    min-height: 180px;
+    min-width: 150px;
+    padding-left: calc(100% / 12 - 10px);
+    width: calc(100% / 12);
+    ul {
+      list-style-type: none;
+      margin: 0px;
+      padding: 0;
+      li {
+        margin: 6px 0;
+        a {
+          display: inline-block;
+          font-size: 16px;
+          text-decoration: none;
+        }
+      }
+    }
+    .ti {
+      border-bottom: solid 2px $text;
+      display: inline-block;
+      margin-bottom: 4px;
+      padding-bottom: 6px;
+    }
+  }
+  #end {
+    color: $text;
+    text-align: center;
+  }
+  .in {
+    display: inline-block;
+  }
+}

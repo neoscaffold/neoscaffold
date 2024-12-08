@@ -1,0 +1,30 @@
+// desktop + tablet
+@media (min-width: $tablet-1 + 1) {
+  .scc .sc {
+    width: 200px;
+    .p {
+      height: 200px;
+    }
+  }
+}
+// mobile and tablet
+@media (max-width: $tablet-1) {
+  .scc {
+    width: calc(50% - 20px);
+    .sc {
+      .p {
+        height: 70%;
+        width: 100%;
+      }
+      .t {
+        height: calc(30% - 20px);
+      }
+    }
+  }
+}
+// mobile
+@media (max-width: $mobile-1) {
+  .scc .sc .t {
+    height: 40px;
+  }
+}

@@ -1,0 +1,24 @@
+<NavBar @linkUrl="index">
+  <div class="tb8">
+    <h1>Sign In</h1>
+  </div>
+</NavBar>
+<div id="pct">
+  <div class="f in">
+    <div class="wf">
+      <div class="tb">
+        <h2>Identity Provider</h2>
+      </div>
+    </div>
+    <div class="wf">
+      <div class="tb cn">
+        <AuthGoogle @mode="signin"/>
+      </div>
+    </div>
+    <div class="wf">
+      <div class="tb cn">
+        <p>Or <LinkTo @route="sign-up"><b>Sign Up</b></LinkTo> for an account.</p>
+      </div>
+    </div>
+  </div>
+</div>

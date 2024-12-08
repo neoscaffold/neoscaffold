@@ -1,0 +1,14 @@
+.litegraph, .graphdialog, .lgraphcanvas {
+  font-family: $attention, sans-serif !important;
+}
+.graphdialog {
+  color: $text;
+  button {
+    background-color: $background;
+    font-family: $attention, sans-serif;
+    font-size: 14px;
+    margin-top: 0;
+    padding: 6px;
+    vertical-align: middle;
+  }
+}

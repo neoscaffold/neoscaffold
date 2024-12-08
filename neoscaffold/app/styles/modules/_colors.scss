@@ -1,0 +1,41 @@
+:root {
+  // light theme
+  --attract: #B8D982;
+  --light-attract: #C0DD92;
+  --dark-attract: #AFD473;
+  --background: #191919;
+  --foreground: #141414;
+
+  --copy: #EEEEEE;
+  --grey: #747474;
+  --text: #EEEEEE;
+
+}
+
+// //Text Colors
+$copy: var(--copy);
+$grey: var(--grey);
+$text: var(--text);
+
+// //Element Colors
+$attract: var(--attract);
+$light-attract: var(--light-attract);
+$dark-attract: var(--dark-attract);
+$background: var(--background);
+$foreground: var(--foreground);
+
+//Colors For Classic Theme
+
+
+// - Orange -
+// LIGHTER - #F85E25
+// REGULAR - #F44708
+// DARKER - #ED4507
+// — Black —
+// LIGHTER- #292929
+// REGULAR - #191919
+// DARKER - #141414
+// — Green —
+// LIGHTER - #C0DD92
+// REGULAR - #B8D982
+// DARKER - #AFD473

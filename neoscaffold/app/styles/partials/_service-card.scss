@@ -1,0 +1,32 @@
+.scc {
+  cursor: pointer;
+  display: inline-block;
+  margin: 10px 10px 0 10px;
+}
+.sc {
+  border-radius: 0;
+  font-size: 18px;
+  position: relative;
+  .ct {
+    .ph {
+      background-size: 100% 100%;
+      line-height: 0;
+      margin: 0;
+      top: 0;
+      width: 100%;
+      img {
+        height: 100%;
+        object-fit: cover;
+        width: 100%;
+      }
+    }
+    .n {
+      font-size: 1.5em;
+      font-weight: 700;
+      margin-left: 10px;
+      overflow: hidden;
+      text-align: center;
+      width: calc(100% - (2 * 10px));
+    }
+  }
+}

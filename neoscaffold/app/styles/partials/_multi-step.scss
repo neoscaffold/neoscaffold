@@ -1,0 +1,30 @@
+#pct {
+  .mse {
+    .ems-progress {
+      .mse-num {
+        background-color: $attract;
+        color: $text;
+        font-size: 16px;
+        padding: 5px 10px;
+        margin-bottom: 10px;
+        &.active {
+          background-color: $text;
+          color: $attract;
+        }
+      }
+    }
+    .ems-nav {
+      min-height: 60px;
+      button {
+        display: inline-block;
+        margin: 10px;
+        &.prv {
+          float: left;
+        }
+        &.nxt {
+          float: right;
+        }
+      }
+    }
+  }
+}

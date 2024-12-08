@@ -1,0 +1,25 @@
+.side-menu {
+  background-color: $foreground;
+  color: $copy;
+  height: calc(100dvh - 49px);
+  margin-right: 0px;
+  box-shadow: none;
+  z-index: 10003;
+  a nav {
+    padding-left: 20px;
+    padding: 20px 0 20px 20px;
+  }
+}
+.side-menu-toggle {
+  display: inline-block;
+  width: initial;
+  height: initial;
+  text-align: right;
+  top: initial;
+  span.toggle-bars {
+    display: none;
+  }
+  .fa {
+    margin-right: 0;
+  }
+}

@@ -1,0 +1,200 @@
+.spf {
+  /* special title*/
+  .spt, .ef-account-form h1 {
+    border-bottom: solid 1px $background;
+    font-family: $attention;
+    font-size: 24px;
+    font-weight: bold;
+    padding: 10px;
+    text-align: left;
+  }
+
+  .spst {
+    font-family: $attention;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 10px;
+    text-align: left;
+  }
+
+  p {
+    padding: 0 10px;
+    text-align: left;
+  }
+
+
+  form {
+
+    .ef-account-form-input br {
+      display: none;
+    }
+
+    .ef-account-caption {
+      padding: 10px;
+    }
+
+    /* put the 1 px gray border on everything in the special form */
+    > *,
+    /* put the 1 px gray border on every account form in the special form */
+    .ef-account-form-input > *,
+    /* put the 1 px gray border on every page in a multistep form in the special form */
+    > .ems .ems-step > div > * {
+      border-bottom: solid 1px $background;
+    }
+    .fa-spinner {
+      border: none;
+    }
+
+    /* remove bottom from last element of nested form */
+    form div:last-of-type {
+      border: none;
+    }
+
+    > label {
+      display: block;
+      padding: 0 10px;
+    }
+
+    .sbd {
+      display: flex;
+      label {
+        flex: 1 0 auto;
+        line-height: 44px;
+        padding: 0 10px;
+        text-align: left;
+        vertical-align: middle;
+      }
+      .form-field {
+        display: flex;
+        padding: 0 10px;
+        text-align: right;
+
+        label {
+          display: none !important;
+        }
+        select {
+          background: none;
+          border: 0;
+          padding: 0 10px !important;
+          width: auto !important;
+        }
+      }
+    }
+
+    .form-field {
+      display: flex;
+      line-height: 44px;
+      min-height: 44px;
+      position: relative;
+
+      label,
+      input {
+        vertical-align: middle;
+      }
+
+      label {
+        flex: 0 0 auto;
+        padding: 0 10px;
+        &.optl .fa {
+          cursor: pointer;
+          font-size: 22px;
+          line-height: 44px;
+          margin-left: 10px;
+          vertical-align: top;
+        }
+      }
+
+      input, select {
+        background-color: $foreground;
+        border: unset;
+        color: $copy;
+        flex: 1 0 auto;
+        padding: 0 10px;
+        position: relative;
+        text-align: right;
+        width: 0;
+        ::-webkit-input-placeholder { /* Chrome/Opera/Safari */
+          color: $grey;
+        }
+        ::-moz-placeholder { /* Firefox 19+ */
+          color: $grey;
+        }
+        :-ms-input-placeholder { /* IE 10+ */
+          color: $grey;
+        }
+        :-moz-placeholder { /* Firefox 18- */
+          color: $grey;
+        }
+      }
+
+      select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        padding-right: 20px;
+        text-align-last: right;
+      }
+      option {
+        direction: rtl;
+      }
+      &.select-field:after {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        bottom: 50%;
+        content: "";
+        font-size: inherit;
+        font: normal normal normal 14px/1 FontAwesome;
+        height: 10px;
+        line-height: 10px;
+        pointer-events: none;
+        position: absolute;
+        right: 5px;
+        text-rendering: auto;
+        top: calc(50% - 5px);
+        width: 10px;
+        z-index: 2;
+      }
+
+      .form-field--errors {
+        display: inherit;
+        font-size: 12px;
+        gap: 5px;
+        margin-top: 30px;
+        max-height: 14px;
+        padding: 0 10px;
+        position: absolute;
+        z-index: 1;
+      }
+
+
+      #pct .ef-account-form-input input:not([type]), #pct .ef-account-form-input input[type="text"], #pct .ef-account-form-input input[type="password"], #pct .ef-account-form-input input[type="email"] {
+        width: 0;
+      }
+
+      &.hidden-field {
+        border: none;
+      }
+
+    }
+    p.tos {
+      font-size: 12px;
+      margin: 0;
+      padding: 10px;
+    }
+  }
+  .ctc .form-field {
+    padding: 0 10px;
+  }
+}
+
+#pct {
+  .spf form .term a {
+    display: inline;
+    font-size: 16px;
+    margin-top: 20px;
+    text-decoration: underline;
+  }
+  .spf button {
+    margin: 10px auto;
+  }
+}

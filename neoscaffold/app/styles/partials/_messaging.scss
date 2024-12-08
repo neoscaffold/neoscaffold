@@ -1,0 +1,63 @@
+div.chat-pnl {
+  @include round-scrollbar;
+  background-color: $foreground;
+  margin: 0 30px;
+  padding: 10px;
+  text-align: left;
+  width: calc(75dvw - 20px);
+  .cht {
+    height: calc(
+      (
+        100dvh
+        -
+        (
+          (
+            60px
+            +
+            env(safe-area-inset-top, 0)
+            )
+            +
+            (
+              60px
+              +
+              env(safe-area-inset-bottom, 0)
+            )
+          )
+        -
+        60px
+      )
+    );
+  }
+  .oth {
+    .msg {
+      border-top-left-radius: 0px;
+    }
+  }
+  .slf {
+    .msg {
+      border-top-right-radius: 0px;
+    }
+  }
+  .msg {
+    background-color: $attract;
+    border-radius: 6px;
+    color: $text;
+    padding: 6px;
+    time:before {
+      content:"\f017";
+      display: inline-block;
+      font-family: FontAwesome;
+      margin-right: 4px;
+    }
+  }
+  .but {
+    background-color: $attract;
+    color: $text;
+  }
+  .subm textarea {
+    border: solid 2px $background;
+    border-right: 0;
+    height: 26px;
+    width: calc(100% - 120px);
+  }
+}

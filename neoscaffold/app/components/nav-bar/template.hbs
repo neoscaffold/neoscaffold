@@ -1,0 +1,29 @@
+<div class="nbr">
+  <div class="wf">
+    {{#if this.canBackPage}}
+      {{!-- template-lint-disable require-presentational-children --}}
+      <div class="bk" role="button" {{on "click" this.goBack}}>
+        <FaIcon @icon="angle-left" class="fa"/>
+      </div>
+    {{else}}
+      {{#if @linkUrl}}
+        {{#if @linkParam}}
+          <LinkTo @route={{@linkUrl}} @model={{@linkParam}} class="bk" role="button">
+            <FaIcon @icon="angle-left" class="fa"/>
+          </LinkTo>
+        {{else}}
+          <LinkTo @route={{@linkUrl}} class="bk" role="button">
+            <FaIcon @icon="angle-left" class="fa"/>
+          </LinkTo>
+        {{/if}}
+      {{/if}}
+    {{/if}}
+    {{yield}}
+    {{!-- template-lint-disable require-presentational-children --}}
+    <LinkTo @route="directory" class="menul" role="button">
+      <nav aria-label="menu">
+        <FaIcon @icon="bars" class="fa"/>
+      </nav>
+    </LinkTo>
+  </div>
+</div>

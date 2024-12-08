@@ -1,0 +1,27 @@
+@mixin height-line-height($height) {
+  height: $height;
+  line-height: $height;
+}
+@mixin aspect-ratio($width, $height, $padding) {
+  position: relative;
+  &:before {
+    content: "";
+    display: block;
+    padding-top: calc($height / $width) * 100%;
+    width: 100%;
+  }
+  > .c {
+    bottom: $padding;
+    left: $padding;
+    position: absolute;
+    right: $padding;
+    top: $padding;
+  }
+}
+@mixin form-container-sizing($lines) {
+  height: $lines * 50px;
+}
+@mixin full-width-and-margin($margin) {
+  margin-left: $margin;
+  width: calc(100% - (2 * #{$margin}));
+}

@@ -1,0 +1,15 @@
+@media (min-width: $mobile-1 + 1) {
+  #pct.ob {
+    div.mse {
+      margin-top: -60px;
+    }
+  }
+}
+// Desktop
+@media ( min-width: $tablet-1 + 1) {
+  #pct.ob {
+    .chat-pnl {
+      width: auto;
+    }
+  }
+}

@@ -1,0 +1,8 @@
+@media (max-width: $mobile-1 ) {
+#pct {
+    div.dc {
+      box-shadow: none;
+      width: calc(100% - 40px);
+    }
+  }
+}

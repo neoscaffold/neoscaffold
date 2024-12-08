@@ -1,0 +1,51 @@
+<div class="nbr">
+    <div class="wf">
+        <div class="bk"></div>
+        <div class="tb8">
+            <h1>NeoScaffold</h1>
+        </div>
+        {{!-- template-lint-disable require-presentational-children --}}
+        <LinkTo @route="directory" class="menul" role="button">
+            <nav aria-label="menu">
+                <FaIcon @icon="bars" class="fa" />
+            </nav>
+        </LinkTo>
+    </div>
+</div>
+<div id="pct" class="shc fw">
+    <div class="hero">
+        <div class="wf hx">
+            <div class="tb"></div>
+            <div class="tb8 lh cn">
+                <p class="pdl pdr">NeoScaffold makes <b>extreme</b> agentic software development cool for your whole organization.</p>
+            </div>
+            <div class="tb"></div>
+        </div>
+        <div class="wf hx">
+            <div class="tb cn">
+              <LinkTo @route="workflow" class="cta btn">Code Now</LinkTo>
+              {{#if this.authEnabled}}
+                <LinkTo @route="sign-up" class="cta2">Get Started</LinkTo>
+              {{/if}}
+            </div>
+        </div>
+    </div>
+    <div class="wf hx"></div>
+    <div class="wf hx">
+        <div class="tb">
+            <br>
+            <div class="wf hx fx vps">
+                <div class="tb vcn cn">
+                    <div class="pdl pdr">
+                        <h2>Unleash Momentum</h2>
+                        <p>Create cool agentic workflows with NeoScaffold.</p>
+                    </div>
+                </div>
+                <div class="tb">
+                    <a href="/assets/cool-p.jpeg.webp"><img src="/assets/cool-p.jpeg.webp" alt="green digital art" class="smimg"></a>
+                </div>
+            </div>
+            <div class="wf hx"></div>
+        </div>
+    </div>
+</div>

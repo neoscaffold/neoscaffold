@@ -1,0 +1,107 @@
+// desktop + tablet
+@media (min-width: $tablet-1 + 1) {
+  #pct.shc {
+    > * {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+    .smimg {
+      border-radius: 10px;
+      display: block;
+      height: 600px;
+      margin: 20px;
+      max-height: 100%;
+      object-fit: cover;
+    }
+  }
+  .scc .sc {
+    width: 200px;
+    .p {
+      height: 200px;
+    }
+  }
+}
+// mobile and tablet
+@media (max-width: $tablet-1) {
+  #pct.shc {
+    .grdct {
+      grid-template-columns: 150px 150px;
+    }
+    .grdit {
+      img {
+        max-width: 100%;
+        height: 150px;
+      }
+    }
+    .center {
+      width: 80%;
+    }
+    .ps-row {
+      img {
+        max-height: 64px;
+        width: 64px;
+      }
+    }
+    .b-s {
+      h1 {
+        line-height: 40px;
+        font-size: 35px;
+      }
+      h2 {
+        font-size: 25px;
+        line-height: 30px;
+      }
+      h3 {
+        margin-left: 10px;
+        font-size: 20px;
+        line-height: 25px;
+        margin: 10px 0 0 10px;
+      }
+
+    }
+  }
+}
+// mobile
+@media (max-width: $mobile-1) {
+  .scc .sc .t {
+    height: 40px;
+  }
+  #pct.shc {
+    .r {
+      text-align: center;
+    }
+    .crsl-inner {
+      height: auto;
+    }
+    .f-t {
+      flex-direction: column;
+      button {
+        margin: 10px !important;
+      }
+    }
+    .center {
+      width: 60%;
+      transform: translate(-50%, 0) !important;
+    }
+    .b-s {
+      position: relative;
+      padding-bottom: 10px;
+      top: 0;
+      transform: translate(-50%, 0);
+      padding: 20px;
+      h1 {
+        line-height: 50px;
+        font-size: 45px;
+      }
+      h1.discover {
+        font-size: 25px;
+        line-height: 30px;
+      }
+      h2 {
+        font-size: 25px;
+        line-height: 30px;
+      }
+
+    }
+  }
+}

@@ -1,0 +1,21 @@
+<NavBar @linkUrl="index">
+  <div class="tb8">
+    <h1>Menu</h1>
+  </div>
+</NavBar>
+<div id="pct">
+  <div class="f in">
+    {{!-- template-lint-disable require-presentational-children --}}
+    <LinkTo @route="workflow" class="wf cbg" role="button">
+      <div class="tb">
+        <FaIcon @icon="diagram-project" class="fa"/>
+      </div>
+      <div class="tb8 cn">
+        <h3>Neo Editor</h3>
+      </div>
+      <div class="tb rght">
+        <FaIcon @icon="angle-right" class="fa"/>
+      </div>
+    </LinkTo>
+  </div>
+</div>

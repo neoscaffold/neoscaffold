@@ -1,0 +1,87 @@
+// Tablet + Desktop
+@media ( min-width: $mobile-1 + 1) and (max-width: $tablet-1) {
+  #pct {
+    .w.lg {
+      .lt {
+        .ems-step > div {
+          background-color: $background;
+        }
+      }
+    }
+  }
+}
+
+// Desktop
+@media ( min-width: $tablet-1 + 1) {
+  #pct {
+    .w.lg {
+      display: flex;
+      .lt {
+        flex : 1 0 0;
+        width: 0;
+      }
+      .md {
+        flex: 1 0 0;
+        display: flex;
+        position: relative;
+        .hf {
+          flex: 1 0 0;
+          font-size: 20px;
+          padding-top: 80px;
+        }
+        .hl {
+          flex: 1 0 0;
+          font-size: 20px;
+          padding-top: 80px;
+        }
+        > button:first-of-type {
+          right: calc(50% + 10px);
+          position: absolute;
+        }
+        > button:last-of-type {
+          left: calc(50% - 10px);
+          position: absolute;
+        }
+      }
+    }
+  }
+}
+
+// Tablet and Mobile
+@media ( max-width: $tablet-1 ) {
+  #pct {
+    .w.lg {
+      padding: 0;
+      width: 100%;
+      .lt {
+        display: block;
+        width: 100%;
+      }
+      .md {
+        display: block;
+        text-align: left;
+        width: 100%;
+        button {
+          margin: 20px 0px 20px 20px;
+          width: calc(50% - 30px);
+        }
+      }
+    }
+  }
+}
+
+// Mobile
+@media ( max-width: $mobile-1 ) {
+  #pct {
+    .w.lg {
+      .md {
+        .hf {
+          font-size: 16px;
+        }
+        .hl {
+          font-size: 16px;
+        }
+      }
+    }
+  }
+}

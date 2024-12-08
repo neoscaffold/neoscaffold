@@ -1,0 +1,50 @@
+@media (min-width: $tablet-1 + 1) {
+  #pct {
+    .fxr {
+      width: calc(100% + 40px);
+    }
+    .mc > .f {
+      @include papery-shadow;
+      display: table;
+      max-width: $mobile-1;
+      margin: 0 auto;
+      padding: 20px;
+    }
+  }
+}
+@media (min-width: $desktop-1 ) {
+  #pct.fw {
+    .f.a {
+      width: calc(100% - 100px);
+    }
+  }
+}
+@media (max-width: $desktop-1) and (min-width: $mobile-1 + 1) {
+  #pct {
+    .f.a {
+      display: block;
+      width: inherit;
+    }
+    .f label.bdy {
+      text-align: center;
+      width: 100%;
+    }
+  }
+}
+@media (max-width: $tablet-1) {
+  #pct {
+    div.f {
+      box-shadow: none;
+    }
+    .f.a {
+      border-radius: 0;
+      box-shadow: none;
+      margin: 0;
+      width: calc(100% - 40px);
+    }
+    .f.up label.bdy {
+      text-align: center;
+      width: 100%;
+    }
+  }
+}

@@ -1,0 +1,544 @@
+#pct {
+  // NICE-275 Listings div on latest page should be centered.
+  // Full width page.
+  &.fw {
+    .f.a {
+      min-width: auto;
+    }
+  }
+  // Reset's `.f` elements width restricting styling
+  .fxr {
+    width: 100dvw;
+    margin: -20px;
+    display: inline-block;
+    // background: $background;
+    // table view group
+    .wbrg {
+      margin-bottom: 20px;
+      // table view header
+      .wbrh {
+        border-bottom: solid 1px $background;
+        padding: 10px;
+        font-size: 24px;
+        font-weight: bold;
+        font-family: $attention;
+      }
+    }
+  }
+  // form
+  div.f {
+    background-color: $foreground;
+    color: $copy;
+    margin: 0 auto;
+    min-width: 200px;
+    padding: 20px;
+    text-align: center;
+    .it-lnk {
+      display: inline-block;
+      margin-top: 0;
+    }
+    // color input (a container for the label + input)
+    .ci label {
+      flex-grow: 1;
+    }
+    input[type=color] {
+      height: 44px;
+      min-width: 50%;
+    }
+    // input[type=text],
+    // input[type=password],
+    // input[type=email],
+    // input[type=number],
+    // input[type=file],
+    // input[type=date],
+    // input[type=time],
+    // input[type=color],
+    // input[type=tel],
+    // input[type=search]:not(.ember-power-select-trigger-multiple-input) {
+    //   border: solid 2px $background;
+    //   color: $copy;
+    //   font-family: $words;
+    //   font-size: 16px;
+    //   height: 30px;
+    //   margin-top: 20px;
+    //   min-width: 160px;
+    //   overflow: hidden;
+    //   padding: 0 4px;
+    //   width: 10vw;
+    // }
+    // label {
+    //   display: inline-block;
+    //   font-size: 16px;
+    //   margin-top: 20px;
+    //   min-width: 100px;
+    //   max-width: 110px;
+    //   width: 6vw;
+    // }
+    label.tl {
+      vertical-align: middle;
+      margin-top: 0px;
+    }
+    .chosen-container {
+      width: auto !important;
+    }
+    .form-field--errors {
+      color: $attract;
+    }
+    .search-choice {
+      margin: 0;
+    }
+    form > div:first-of-type > label {
+      margin-top: 0;
+    }
+  }
+  .f.in {
+    max-width: 600px;
+    text-align: center;
+    form a {
+      display: block;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    #google-client-button {
+      display: inline-block;
+    }
+  }
+  // universal purpose, also sign up form
+  .f.up {
+    .upt {
+      display: inline-block;
+      font-size: 14px;
+      margin-right: 10px;
+      margin-top: 26px;
+      max-width: calc(100% - 60px);
+      text-decoration: underline;
+    }
+    .upck {
+      margin-bottom: 20px;
+      min-height: 40px;
+      text-align: left;
+      .checkbox-field {
+        float: right;
+        margin: 15px 0;
+        label {
+          width: 60px;
+          margin-right: -10px;
+        }
+      }
+    }
+    .bm,
+    .bd {
+      margin-right: 2px;
+    }
+    .by,
+    .bm,
+    .bd {
+      label {
+        min-width: 0;
+        width: inherit;
+        display: block;
+        margin-bottom: 10px;
+      }
+    }
+    .s-bd {
+      min-width: 160px;
+    }
+    .terms {
+      @include inline-vertical-middle;
+      color: $copy;
+      overflow: hidden;
+    }
+    .hl {
+      max-width: 100%;
+      width: 100%;
+    }
+  }
+  // container with form and assistant
+  .f.a {
+    border-right: 0px;
+    display: inline-block;
+    margin: 0 30px;
+    min-width: 200px;
+    width: calc(75dvw - 30px);
+
+    // search
+    &.s {
+      text-align: left;
+      span .fa {
+        cursor: pointer;
+      }
+      .pg {
+        text-align: center;
+        > :first-child {
+          margin-left: 0;
+        }
+        button, span {
+          display: inline-block;
+          margin: 0 0 10px 10px;
+        }
+      }
+    }
+    // multi-step-form
+    .mse {
+      text-align: center;
+    }
+    textarea {
+      max-width: 100%;
+    }
+    // hidden input
+    .hidi {
+      height: 1px;
+      left: -9999999px;
+      position: absolute;
+      width: 1px;
+    }
+    // upload label
+    .uplb {
+      background-color: $attract;
+      border-radius: 10px;
+      color: $text;
+      cursor: pointer;
+      font-family: $attention;
+      margin: 10px auto;
+      max-width: none;
+      padding: 0 5px;
+      text-align: center;
+    }
+  }
+
+}
+
+  /**
+   * ember-form-for generates the following structure for checkboxes:
+   *
+   * = f.checkbox-field 'l' label='Show Listings'
+   *
+   * .checkbox-field
+   *   label
+   *     input
+   *     Show Listings
+   *
+   */
+  .checkbox-field {
+    box-sizing: border-box;
+    height: 50px;
+    overflow: auto;
+    text-align: left;
+
+    input {
+      visibility: hidden;
+      width: 0;
+      margin: 0;
+      display: none;
+    }
+
+    label {
+      border-radius: 30px;
+      box-sizing: border-box;
+      cursor: pointer;
+      display: block;
+      height: 30px;
+      line-height: 30px;
+      margin-top: 6px;
+      outline: none;
+      padding: 0 10px;
+      position: relative;
+      user-select: none;
+      width: 100%;
+    }
+
+    label:before,
+    label:after {
+      bottom: 0;
+      box-sizing: border-box;
+      content: "";
+      display: block;
+      position: absolute;
+      top: 0;
+    }
+
+    label:before {
+      background-color: $background;
+      border-radius: 30px;
+      border: 1px solid $text;
+      // left: 0;
+      right: 0;
+      width: 50px;
+      margin-right: 10px;
+    }
+
+    label:after {
+      background-color: $text;
+      border-radius: 100%;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+      filter: blur(0);
+      height: 26px;
+      right: 22px;
+      margin-top: 2px;
+      margin-right: 10px;
+      width: 26px;
+    }
+
+    .checked-true:after {
+      @include slideright(0.4s);
+      right: 2px;
+    }
+
+    .checked-false:after {
+      @include slideleft(0.4s);
+    }
+
+    .checked-true:before {
+      @include switchcolorred(0.4s);
+      background-color: $attract;
+    }
+
+    .checked-false:before {
+      @include switchcolorgray(0.4s);
+    }
+
+    label > a {
+      display: inline-block;
+      margin: 0;
+    }
+  }
+
+/* apple text field
+ * Note: This will not work for ember-form-for
+ * Here is an example of how to use this input styling:
+ *
+ * .atf
+ *   input type="email" placeholder="Email" onfocus="this.placeholder = ''" onblur="this.placeholder = 'Email'"
+ *   label
+ *     | Email
+ *
+ * Note that the input needs to have those exact 'placeholder', 'onfocus',
+ *   and 'onblur' attributes, with the desired text substituted in the
+ *   placeholder, and onblur attributes.
+ */
+.atf {
+  position: relative;
+  input {
+    background-color: $background;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    width: calc(100% - 20px);
+  }
+  label {
+    display: none;
+  }
+}
+
+/* These are the two ways of styling ember-form-for inputs
+ * Here is an example of how to use this input styling:
+ *
+ * .smi
+ *   = f.email-field 'e' label='Email' inputClasses='e' placeholder=" "
+ *
+ * Note that the class needs to wrap the ember-form-for element,
+ *   needs to include
+ *   and needs to have an empty 'placeholder' attribute
+ *
+ * Note: These two fields are very similar, and could be combined with
+ *   a mixin or inheritance, but it was put off to stay less confusing
+ */
+
+// swapped custom apple 'text field' input
+.sai {
+  position: relative;
+  div {
+    text-align: left;
+  }
+  input {
+    background-color: $background;
+    border-radius: 5px;
+    border: none;
+    box-sizing: content-box;
+    cursor: pointer;
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 20px;
+    margin-top: 12px;
+    padding: 10px 10px 10px 10px;
+    position: relative;
+    width: calc(100% - 20px);
+    // hide the "placeholder" text (label) with a z-index
+    // adjustment when focused, or when there's a value
+    // NOTE: This isn't supported on Edge
+    &:not(:placeholder-shown),
+    &:focus {
+      z-index: 2;
+    }
+  }
+
+  label {
+    color: $light-attract;
+    font-size: 16px;
+    font-weight: normal;
+    left: 11px;
+    pointer-events: none;
+    position: absolute;
+    top: 12px;
+    z-index: 1;
+  }
+}
+
+// swapped custom material underline input
+.smi {
+  border-bottom: 1px solid $copy;
+  position: relative;
+  div {
+    text-align: left;
+  }
+  input, select {
+    background-color: $foreground;
+    border: none;
+    box-sizing: content-box;
+    caret-color: $attract;
+    cursor: pointer;
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 20px;
+    margin-bottom: 1px; // spacing for the box-shadow
+    margin-top: 12px;
+    padding: 10px 0;
+    position: relative;
+    width: 100%;
+    // hide the "placeholder" text (label) with a z-index
+    // adjustment when focused, or when there's a value
+    // NOTE: This isn't supported on Edge
+    &:not(:placeholder-shown),
+    &:focus {
+      z-index: 2;
+    }
+    // only change the boxshadow when focused
+    &:focus {
+      box-shadow: 2px 0px 0px 0px $foreground,
+        -2px 0px 0px 0px $foreground,
+        0px 2px 0px 0px $attract;
+    }
+  }
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: 0;
+  }
+  .select-field:after {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    bottom: 50%;
+    color: $copy;
+    content: "";
+    font-size: inherit;
+    font: normal normal normal 14px/1 FontAwesome;
+    height: 10px;
+    line-height: 10px;
+    pointer-events: none;
+    position: absolute;
+    right: 5px;
+    text-rendering: auto;
+    top: calc(50% - 5px);
+    width: 10px;
+    z-index: 2;
+  }
+
+  label {
+    color: $copy;
+    font-size: 14px;
+    font-weight: normal;
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 13px;
+    z-index: 1;
+  }
+}
+
+.textarea-field {
+  max-height: 300px;
+  display: block !important;
+  margin-top: 10px;
+  label {
+    display: block;
+    margin-bottom: 10px;
+
+    // other fields and their labels use `line-height: 44px;`
+    line-height: 1.4em !important; // results in a 44px height when 2 lines
+    min-height: 24px;
+  }
+  textarea {
+    max-height: 245px;
+    display: block;
+    background: none;
+    overflow: auto;
+    border: 0;
+    padding: 0 10px;
+    width: calc(100% - 20px);
+    resize: vertical;
+    height: 2.5 * 1.15em; // line numbers * line height
+  }
+}
+
+/*
+ * A wrapper to style ember-multi-select in our forms
+ *
+ * Ember power selects need to be put into the following
+ *   structure to play nice with spf forms:
+ *
+ * .multi-select-field
+ *   label ...
+ *   = power-select-multiple ...
+ *
+ */
+.multi-select-field {
+  display: block !important;
+  margin-top: 10px;
+  padding-bottom: 10px;
+  label {
+    display: block;
+    margin-bottom: 10px;
+    padding: 0 10px;
+
+    // other fields and their labels use `line-height: 44px;`
+    line-height: 1.4em !important; // results in a 44px height when 2 lines
+    min-height: 24px;
+  }
+  .ember-power-select-trigger {
+    // width: calc(100% - 40px);
+    background-color: $foreground;
+    border: 0;
+    outline: 0;
+    padding: 10px;
+    border-radius: 0;
+    // a selected option - ember-power-select-multiple-option
+    ul li {
+      background-color: $attract;
+      color: $text;
+      border: 0;
+      padding: 4px 8px;
+      // the close `x`
+      span {
+        opacity: 1;
+        color: $text;
+      }
+    }
+    // dropdown arrow
+    > span {
+      border-color: $copy transparent transparent transparent;
+    }
+    .ember-power-select-trigger-multiple-input {
+      background-color: $foreground;
+    }
+  }
+}
+
+.ember-power-select-option {
+  background-color: $foreground;
+}
+.ember-power-select-option[aria-current=true] {
+  background-color: $dark-attract;
+}

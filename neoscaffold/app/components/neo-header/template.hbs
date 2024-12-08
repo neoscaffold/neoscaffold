@@ -1,0 +1,55 @@
+<header class="ns">
+  <div id="logo">
+    <LinkTo @route="index" class="index active ember-view">
+      <img src="/assets/neoscaffold-typeface.webp" alt="NeoScaffold">
+    </LinkTo>
+  </div>
+  <LinkTo @route="workflow">
+    <nav aria-label="workflows">
+      <span class="i">Create NeoScaffold Workflows</span>
+      <FaIcon @icon="diagram-project" class="fa"/>
+      <span class="nlbl">Editor</span>
+    </nav>
+  </LinkTo>
+  <div id="preferences">
+    {{!-- <div id="search">
+      <form>
+        <div class="atf sb">
+          <FaIcon id="srchi" @icon="search" class="fa"/>
+          <input id="search-text" placeholder="Search..." class="ember-text-field ember-view" type="text">
+        </div>
+      </form>
+    </div> --}}
+    {{#if this.authEnabled}}
+      {{#if this.session.isAuthenticated}}
+        <div id="account">
+          <div class="signout">
+            {{!-- template-lint-disable require-presentational-children --}}
+            <div role="button" {{on "click" this.signOut}}>
+              <span class="i">Sign out of your account.</span>
+              <FaIcon @icon="sign-out" class="fa" />
+              <span class="nlbl">Sign Out</span>
+            </div>
+          </div>
+        </div>
+      {{else}}
+        <div id="account">
+          <div>
+            <LinkTo @route="sign-in" class="ember-view">
+              <span class="i">Sign in to your account.</span>
+              <FaIcon @icon="sign-in" class="fa" />
+              <span class="nlbl">Sign In</span>
+            </LinkTo>
+          </div>
+          <div>
+            <LinkTo @route="sign-up" class="ember-view">
+              <span class="i">Sign up for an account today.</span>
+              <FaIcon @icon="user-plus" class="fa" />
+              <span class="nlbl">Sign Up</span>
+            </LinkTo>
+          </div>
+        </div>
+      {{/if}}
+    {{/if}}
+  </div>
+</header>

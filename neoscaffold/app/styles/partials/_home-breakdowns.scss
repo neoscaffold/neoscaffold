@@ -1,0 +1,34 @@
+@media (max-width: $tablet-1) {
+  #pct {
+    .hm {
+      .w:not(.ht) {
+        .on {
+          .oct {
+            max-width: 95%;
+          }
+        }
+      }
+    }
+  }
+}
+@media ( max-width: $mobile-1 ) {
+  #pct {
+    .w.ht {
+      padding-bottom: 0;
+    }
+    .hm {
+      h2 {
+        font-size: 18px;
+      }
+      h3 {
+        font-size: 14px;
+      }
+      th, li {
+        font-size: 14px;
+      }
+      td {
+        font-size: 12px;
+      }
+    }
+  }
+}

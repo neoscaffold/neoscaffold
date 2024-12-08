@@ -1,0 +1,171 @@
+.nbr {
+  background-color: $foreground;
+  border-bottom: solid 1px $background;
+  color: $copy;
+  height: 49px;
+  left: 0;
+  padding-top: env(safe-area-inset-top, 0);
+  top: 0;
+  width: 100%;
+  z-index: 9;
+  .rght .fa {
+    font-size: 49px;
+    line-height: 49px;
+    margin-right: 10px;
+  }
+}
+.wbr {
+  border-bottom: solid 1px $background;
+  color: $copy;
+  cursor: pointer;
+  text-align: left;
+  .fa {
+    display: inline-block;
+    margin-right: 10px;
+    min-width: 28px;
+    vertical-align: top;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    display: inline-block;
+    line-height: 50px;
+    text-align: left;
+    vertical-align: top;
+  }
+}
+.wf {
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  height: 50px;
+  width: 100%;
+  img {
+    max-height: 49px;
+  }
+  .cbg {
+    background-color: var(--background);
+  }
+  .bk {
+    flex: 1 0 0;
+    .fa {
+      height: 30px;
+      margin-left: 0;
+      padding: 10px 10px;
+    }
+  }
+  .menul {
+    flex: 1 0 0;
+    nav {
+      text-align: right;
+      .fa {
+        height: 30px;
+        margin-left: 0;
+        padding: 10px 10px;
+      }
+    }
+  }
+  .fw {
+    flex: 1 0 0;
+    text-align: right;
+    .fa {
+      font-size: 49px;
+      line-height: 49px;
+      margin-right: 10px;
+    }
+    .fa-ellipsis-v {
+      font-size: 30px;
+      line-height: 54px;
+      margin-right: 0;
+      padding: 0 15px 0 10px;
+    }
+    .fa-2 {
+      font-size: 50px;
+      line-height: 50px;
+    }
+  }
+  .tb {
+    flex: 1 0 0;
+    line-height: 50px;
+    vertical-align: middle;
+  }
+  .tb2 {
+    flex: 2 0 0;
+    line-height: 49px;
+    vertical-align: middle;
+  }
+  .tb8 {
+    flex: 8 0 0;
+    line-height: 49px;
+    vertical-align: middle;
+  }
+  .tb,
+  .tb2,
+  .tb8 {
+    > .fa {
+      cursor: pointer;
+      font-size: 22px;
+      height: 30px;
+      margin: 10px 10px;
+      text-align: center;
+    }
+    // center in tb
+    &.cn {
+      text-align: center;
+    }
+    // nav bar titles invisible by default
+    .ti {
+      display: none;
+    }
+  }
+  // smaller fontsize
+  .sml {
+    font-size: 18px;
+    line-height: 56px;
+    height: 100%;
+    overflow: hidden;
+  }
+  // right align in tb
+  .rght {
+    text-align: right;
+  }
+  .vmid {
+    margin: auto 0 auto 0;
+  }
+  // left align in tb
+  .left {
+    text-align: left;
+  }
+  // padding-eft
+  .pdl {
+    box-sizing: border-box;
+    padding-left: 10px;
+  }
+  // padding-right
+  .pdr {
+    box-sizing: border-box;
+    padding-right: 10px;
+  }
+  // height auto grow
+  &.hx {
+    height: auto;
+    min-height: 50px;
+  }
+  // image container
+  .ict {
+    border: solid 1px $attract;
+    display: inline-block;
+    height: 49px;
+    line-height: 0;
+    margin: 0 5px 5px 0;
+    overflow: hidden;
+    padding: 5px;
+  }
+  // offer owner center text on transactions
+  .owcn {
+    line-height: 22px;
+  }
+  // offer owner item no height
+  .oinh {
+    line-height: 0;
+  }
+}

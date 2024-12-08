@@ -1,0 +1,25 @@
+@media (max-width: $desktop-1) and (min-width: $mobile-1) {
+  #pct {
+    .h {
+      border-top: 0;
+      display: block;
+      margin-left: 30px;
+      position: relative;
+      top: 20px;
+      width: inherit;
+    }
+  }
+}
+@media (max-width: $mobile-1 ) {
+  #pct {
+    .h {
+      border-top: 0;
+      box-shadow: none;
+      display: block;
+      margin-left: 30px;
+      position: relative;
+      top: 20px;
+      width: inherit;
+    }
+  }
+}

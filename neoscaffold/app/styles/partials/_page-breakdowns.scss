@@ -1,0 +1,44 @@
+@media (min-width: $mobile-1 + 1) {
+  #pct {
+    padding: 20px 0;
+    .w .md.ic .fa {
+      width: 100%;
+    }
+  }
+}
+@media (max-width: $mobile-1 ) {
+  span.i { display: none; }
+  #pct {
+    background: $foreground;
+    height: calc(
+                  100dvh
+                  -
+                  (
+                    (
+                      50px
+                      +
+                      env(safe-area-inset-top, 0)
+                    )
+                    +
+                    (
+                      50px
+                      +
+                      env(safe-area-inset-bottom, 0)
+                    )
+                  )
+                );
+    overflow-x: hidden;
+    // overflow-y: scroll; // NEVER USE THIS IT BREAKS GESTURES!
+    margin: 0 0 0 0;
+    padding: calc(
+      50px
+      +
+      env(safe-area-inset-top, 0)
+    ) 0 0 0;
+
+    .w .md.ic .fa {
+      text-align: center;
+      width: 100%;
+    }
+  }
+}

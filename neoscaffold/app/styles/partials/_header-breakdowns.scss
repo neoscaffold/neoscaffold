@@ -1,0 +1,41 @@
+@media (min-width: ($tablet-1 + 1)) {
+  header {
+    z-index: 10005;
+  }
+}
+@media (max-width: $desktop-1) and (min-width: ($tablet-1 + 1)) {
+  header {
+    #preferences #search .fa.fa-search {
+      vertical-align: baseline;
+      margin-right: 6px;
+    }
+    .fa {
+      font-size: 16px;
+      margin-right: 0;
+      &.fa-2x {
+        font-size: 32px;
+      }
+    }
+  }
+}
+@media (max-width: $tablet-1) and (min-width: ($mobile-1 + 1)) {
+  header {
+    z-index: 10008;
+    // > a nav {
+    //   display:none;
+    // }
+    #preferences #account {
+      font-size: 0;
+      margin-right: 0px;
+      .fa {
+        font-size: 16px;
+        margin-right: 6px;
+      }
+    }
+  }
+}
+@media (max-width: $mobile-1) {
+  header {
+    display: none;
+  }
+}
