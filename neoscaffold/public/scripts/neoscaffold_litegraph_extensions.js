@@ -377,7 +377,8 @@
       let graph = new LGraph(); // eslint-disable-line no-undef
       let canvas = new LGraphCanvas(canvasIdSelector, graph); // eslint-disable-line no-undef
 
-      this.addExtraMenuOptions(canvas);
+      // this.addExtraMenuOptions(canvas);
+      this.addSideMenuOptions(canvas);
 
       scope.litegraph_canvas = canvas;
       canvas.canvas.width = window.innerWidth;
@@ -1403,6 +1404,71 @@
           },
         );
       };
+    },
+
+    addSideMenuOptions(canvas) {
+      // Create floating side menu container
+      let sideMenu = document.createElement('div');
+      sideMenu.style.position = 'fixed';
+      sideMenu.style.right = '20px';
+      sideMenu.style.top = '50%';
+      sideMenu.style.transform = 'translateY(-50%)';
+      sideMenu.style.backgroundColor = '#2c2c2c';
+      sideMenu.style.padding = '10px';
+      sideMenu.style.borderRadius = '5px';
+      sideMenu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+      sideMenu.style.zIndex = '1000';
+
+      // Add buttons to side menu
+      const menuItems = [
+        {
+          label: 'Queue',
+          callback: () => NeoScaffold.queuePrompt(1)
+        },
+        {
+          label: 'Export',
+          callback: () => NeoScaffold.exportWorkflow()
+        },
+        {
+          label: 'Import',
+          callback: () => document.getElementById('workflow-input').click()
+        },
+        {
+          label: 'Toggle Breakpoints',
+          callback: () => NeoScaffold.toggleBreakpoints(canvas)
+        },
+        {
+          label: 'Clear',
+          callback: () => NeoScaffold.clean()
+        }
+      ];
+
+      menuItems.forEach(item => {
+        let button = document.createElement('button');
+        button.innerText = item.label;
+        button.style.display = 'block';
+        button.style.width = '100%';
+        button.style.padding = '8px 15px';
+        button.style.marginBottom = '5px';
+        button.style.border = 'none';
+        button.style.borderRadius = '3px';
+        button.style.backgroundColor = '#3c3c3c';
+        button.style.color = '#fff';
+        button.style.cursor = 'pointer';
+
+        button.addEventListener('mouseover', () => {
+          button.style.backgroundColor = '#4c4c4c';
+        });
+
+        button.addEventListener('mouseout', () => {
+          button.style.backgroundColor = '#3c3c3c';
+        });
+
+        button.addEventListener('click', item.callback);
+        sideMenu.appendChild(button);
+      });
+
+      document.body.appendChild(sideMenu);
     }
 
   });
