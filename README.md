@@ -18,7 +18,7 @@
 </div>
 
 <h1 align="center">
-  <img style="width: 400px;" src="pictures/neoscaffold-typeface-logo.webp" alt="NeoScaffold Logo"/>
+  <img style="width: 400px;" src="pictures/neoscaffold-typeface.webp" alt="NeoScaffold Logo"/>
 </h1>
 
 NeoScaffold let's you visually program workflows for ai agents and more.
