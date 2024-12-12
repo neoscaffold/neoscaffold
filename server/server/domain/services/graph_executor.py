@@ -137,10 +137,8 @@ async def sequential_runtime_step(
             )
             # check if the event has been set
             event = breakpoints["nodes"][node_id]
-            await event.wait()
-            # clean up the event
             event.clear()
-            del breakpoints["nodes"][node_id]
+            await event.wait()
 
     # override the action if there is an override for it planned
     if node_id in evaluation_override_actions:

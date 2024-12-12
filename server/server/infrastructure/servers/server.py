@@ -357,12 +357,29 @@ class Server:
         for node_id in node_ids:
             if node_id in workflow["breakpoints"]["nodes"]:
                 event = workflow["breakpoints"]["nodes"][node_id]
+                event.clear()
+                del workflow["breakpoints"]["nodes"][node_id]
+            else:
+                workflow["breakpoints"]["nodes"][node_id] = asyncio.Event()
+
+        return workflow
+
+    def step_through_breakpoints(self, client_id, workflow_id, node_ids=[]):
+        workflow = self.get_or_create_workflow(client_id, workflow_id)
+
+        if "breakpoints" not in workflow:
+            workflow["breakpoints"] = {"last_modified": time.time(), "nodes": {}}
+
+        if "nodes" not in workflow["breakpoints"]:
+            workflow["breakpoints"]["nodes"] = {}
+
+        for node_id in node_ids:
+            if node_id in workflow["breakpoints"]["nodes"]:
+                event = workflow["breakpoints"]["nodes"][node_id]
                 if not event.is_set():
                     event.set()
                 else:
                     event.clear()
-            else:
-                workflow["breakpoints"]["nodes"][node_id] = asyncio.Event()
 
         return workflow
 

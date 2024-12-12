@@ -8,6 +8,39 @@ from ...domain.utilities.authorize_user_and_get_info import authorize_user_and_g
 def base_routes(server):
     routes = server.routes
 
+    @routes.post("/breakpoints/step-through")
+    async def step_through_breakpoints(request):
+        info = authorize_user_and_get_info(request)
+
+        if isinstance(info, web.Response):
+            return info
+
+        user_info = info.get("user_info", {})
+
+        user_id = user_info.get("user_id")
+        if not user_id:
+            return web.json_response({"error": "No user id"}, status=401)
+
+        json_data = await request.json()
+
+        if "workflow_id" in json_data and ("node_ids" in json_data):
+            workflow_with_breakpoints = server.step_through_breakpoints(
+                user_id, json_data.get("workflow_id"), json_data.get("node_ids")
+            )
+            server.logger.info(workflow_with_breakpoints)
+
+            return web.json_response(
+                {
+                    "user_id": user_id,
+                    "workflow_id": json_data.get("workflow_id"),
+                    "node_ids": json_data.get("node_ids"),
+                }
+            )
+        else:
+            return web.json_response(
+                {"error": "no prompt", "node_errors": []}, status=400
+            )
+
     @routes.post("/breakpoints")
     async def post_breakpoints(request):
         info = authorize_user_and_get_info(request)

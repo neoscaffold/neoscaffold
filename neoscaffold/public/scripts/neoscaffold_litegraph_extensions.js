@@ -138,6 +138,37 @@
       }
     },
 
+    async postStepThroughBreakpoints(workflow_id, node_ids) {
+      const authorizationHeaders = this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+
+      const body = JSON.stringify({
+        workflow_id,
+        node_ids
+      });
+
+      let results;
+      try {
+        results = await fetch(`${this.baseURL}/breakpoints/step-through`, {
+          method: 'POST',
+          headers: authorizationHeaders,
+          body
+        });
+        return results.json();
+      } catch (error) {
+        if (
+          error.message &&
+          (error.message.toLowerCase().includes('401') ||
+            error.message.toLowerCase().includes('token expired') ||
+            error.message.toLowerCase().includes('unauthorized'))
+        ) {
+          global.NeoScaffold.applicationSession.invalidate();
+          global.NeoScaffold.applicationRouter.transitionTo('sign-in');
+        }
+        throw error;
+      }
+    },
+
     initializeWebSocket() {
       const scope = this;
 
@@ -198,8 +229,15 @@
             let node = NeoScaffold.graph.getNodeById(data.breakpoint);
             if (node) {
               node.storeAndSwitchColors("#2a363b", "#2a363b");
+
+              scope.instance.litegraphCanvas.centerOnNode(node);
+
+              let selectedNodes = scope.instance.litegraphCanvas.selected_nodes;
+              selectedNodes[node.id] = node;
+
+              NeoScaffold.graph.setDirtyCanvas(true);
+              return;
             }
-            return;
           }
 
           if (data.node_errors && data.node_errors.length) {
@@ -207,8 +245,15 @@
             if (node) {
               node.properties.node_errors = data.node_errors;
               node.storeAndSwitchColors("#FF0000", "#FF0000");
+
+              scope.instance.litegraphCanvas.centerOnNode(node);
+
+              let selectedNodes = scope.instance.litegraphCanvas.selected_nodes;
+              selectedNodes[node.id] = node;
+
+              NeoScaffold.graph.setDirtyCanvas(true);
+              return;
             }
-            return;
           }
 
           if (data.evaluation_action) {
@@ -259,7 +304,7 @@
                     delete node.properties.node_errors;
                   }
 
-                  node.restoreColors(true);
+                  node.restoreColors();
                 }
               }
             });
@@ -370,17 +415,18 @@
     async createGraph(canvasSelector, baseURL, sessionKey) {
       let scope = this;
 
-      this.api.baseURL = baseURL || this.api.baseURL;
-      this.api.sessionKey = sessionKey;
+      scope.api.baseURL = baseURL || scope.api.baseURL;
+      scope.api.sessionKey = sessionKey;
+      scope.api.instance = scope;
       let canvasIdSelector = canvasSelector || '#litegraph';
 
       let graph = new LGraph(); // eslint-disable-line no-undef
       let canvas = new LGraphCanvas(canvasIdSelector, graph); // eslint-disable-line no-undef
 
-      // this.addExtraMenuOptions(canvas);
-      this.addSideMenuOptions(canvas);
+      // scope.addExtraMenuOptions(canvas);
+      scope.addSideMenuOptions(canvas);
 
-      scope.litegraph_canvas = canvas;
+      scope.litegraphCanvas = canvas;
       canvas.canvas.width = window.innerWidth;
       canvas.canvas.height = window.innerHeight - 50;
 
@@ -422,7 +468,7 @@
 
       // We failed to restore a workflow so load the default
       if (!restored) {
-        this.defaultGraph();
+        scope.defaultGraph();
       }
 
       // Save current workflow automatically
@@ -1346,14 +1392,37 @@
 
     async toggleBreakpoints(canvas) {
       const workflowSnapshot = await NeoScaffold.export();
-      const nodeToggles = [];
+
       if (workflowSnapshot) {
         graph = canvas.graph;
         graph.beforeChange();
 
+        if (!canvas.hasOwnProperty("breakpoints")) {
+          canvas.breakpoints = {};
+        }
 
+        if (!canvas.breakpoints.hasOwnProperty(workflowSnapshot.checksum)) {
+          canvas.breakpoints[workflowSnapshot.checksum] = {};
+        }
+
+        if (!canvas.selected_nodes || Object.keys(canvas.selected_nodes).length === 0) {
+          alert('No nodes selected');
+          return;
+        }
         Object.keys(canvas.selected_nodes).forEach((nodeId) => {
-          nodeToggles.push(nodeId);
+          const node = canvas.selected_nodes[nodeId];
+
+          if (canvas.breakpoints[workflowSnapshot.checksum][nodeId]) {
+            // remove the breakpoint
+            delete canvas.breakpoints[workflowSnapshot.checksum][nodeId];
+            node.restoreColors();
+
+          } else {
+            // adds the breakpoint
+            canvas.breakpoints[workflowSnapshot.checksum][nodeId] = true;
+            node.storeAndSwitchColors("#141414", "#141414");
+          }
+
           if (canvas.onNodeDeselected) {
             canvas.onNodeDeselected(canvas.selected_nodes[nodeId]);
           }
@@ -1364,8 +1433,37 @@
         canvas.highlighted_links = {};
         canvas.setDirty(true);
         canvas.graph.afterChange();
-        await NeoScaffold.api.postToggleBreakpoints(workflowSnapshot.checksum, nodeToggles);
+
+        const nodeIds = Object.keys(canvas.breakpoints[workflowSnapshot.checksum]);
+        await NeoScaffold.api.postToggleBreakpoints(workflowSnapshot.checksum, nodeIds);
       }
+    },
+
+    async stepThroughBreakpoints(canvas) {
+      const workflowSnapshot = await NeoScaffold.export();
+      if (!workflowSnapshot) {
+        return;
+      }
+      const nodeIds = [];
+
+      if (!canvas.selected_nodes || Object.keys(canvas.selected_nodes).length === 0) {
+        alert('No nodes selected');
+        return;
+      }
+      Object.keys(canvas.selected_nodes).forEach((nodeId) => {
+        nodeIds.push(nodeId);
+
+        if (canvas.onNodeDeselected) {
+          canvas.onNodeDeselected(canvas.selected_nodes[nodeId]);
+        }
+      });
+      canvas.selected_nodes = {};
+
+      canvas.current_node = null;
+      canvas.highlighted_links = {};
+      canvas.setDirty(true);
+      canvas.graph.afterChange();
+      await NeoScaffold.api.postStepThroughBreakpoints(workflowSnapshot.checksum, nodeIds);
     },
 
     addExtraMenuOptions(canvas) {
@@ -1394,6 +1492,12 @@
             content: 'Toggle Breakpoints',
             callback: () => {
               NeoScaffold.toggleBreakpoints(canvas);
+            },
+          },
+          {
+            content: 'Step Through Breakpoints',
+            callback: () => {
+              NeoScaffold.stepThroughBreakpoints(canvas);
             },
           },
           {
@@ -1436,6 +1540,10 @@
         {
           label: 'Toggle Breakpoints',
           callback: () => NeoScaffold.toggleBreakpoints(canvas)
+        },
+        {
+          label: 'Step Through Breakpoints',
+          callback: () => NeoScaffold.stepThroughBreakpoints(canvas)
         },
         {
           label: 'Clear',
