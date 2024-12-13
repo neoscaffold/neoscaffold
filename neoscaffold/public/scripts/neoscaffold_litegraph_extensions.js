@@ -107,18 +107,19 @@
       }
     },
 
-    async postToggleBreakpoints(workflow_id, node_ids) {
+    async postToggleBreakpoints(workflow_id, node_ids, allBreak) {
       const authorizationHeaders = this.getAuthorizationHeaders();
       authorizationHeaders['Content-Type'] = 'application/json';
 
       const body = JSON.stringify({
         workflow_id,
-        node_ids
+        node_ids,
+        all_break: allBreak
       });
 
       let results;
       try {
-        results = await fetch(`${this.baseURL}/breakpoints`, {
+        results = await fetch(`${this.baseURL}/interventions/breakpoints`, {
           method: 'POST',
           headers: authorizationHeaders,
           body
@@ -149,7 +150,71 @@
 
       let results;
       try {
-        results = await fetch(`${this.baseURL}/breakpoints/step-through`, {
+        results = await fetch(`${this.baseURL}/interventions/breakpoints/step-through`, {
+          method: 'POST',
+          headers: authorizationHeaders,
+          body
+        });
+        return results.json();
+      } catch (error) {
+        if (
+          error.message &&
+          (error.message.toLowerCase().includes('401') ||
+            error.message.toLowerCase().includes('token expired') ||
+            error.message.toLowerCase().includes('unauthorized'))
+        ) {
+          global.NeoScaffold.applicationSession.invalidate();
+          global.NeoScaffold.applicationRouter.transitionTo('sign-in');
+        }
+        throw error;
+      }
+    },
+
+    async postToggleStop(workflow_id, node_ids, allStop) {
+      const authorizationHeaders = this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+
+      const body = JSON.stringify({
+        workflow_id,
+        node_ids,
+        all_stop: allStop
+      });
+
+      let results;
+      try {
+        results = await fetch(`${this.baseURL}/interventions/stop-points`, {
+          method: 'POST',
+          headers: authorizationHeaders,
+          body
+        });
+        return results.json();
+      } catch (error) {
+        if (
+          error.message &&
+          (error.message.toLowerCase().includes('401') ||
+            error.message.toLowerCase().includes('token expired') ||
+            error.message.toLowerCase().includes('unauthorized'))
+        ) {
+          global.NeoScaffold.applicationSession.invalidate();
+          global.NeoScaffold.applicationRouter.transitionTo('sign-in');
+        }
+        throw error;
+      }
+    },
+
+    async postToggleRestart(workflow_id, node_ids, allRestart) {
+      const authorizationHeaders = this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+
+      const body = JSON.stringify({
+        workflow_id,
+        node_ids,
+        all_restart: allRestart
+      });
+
+      let results;
+      try {
+        results = await fetch(`${this.baseURL}/interventions/restart-points`, {
           method: 'POST',
           headers: authorizationHeaders,
           body
@@ -423,7 +488,7 @@
       let graph = new LGraph(); // eslint-disable-line no-undef
       let canvas = new LGraphCanvas(canvasIdSelector, graph); // eslint-disable-line no-undef
 
-      // scope.addExtraMenuOptions(canvas);
+      scope.addExtraMenuOptions(canvas);
       scope.addSideMenuOptions(canvas);
 
       scope.litegraphCanvas = canvas;
@@ -1390,8 +1455,38 @@
       alert('Missing node types: ' + missingNodeTypes.join(', '));
     },
 
-    async toggleBreakpoints(canvas) {
+    async stepThroughBreakpoints(canvas) {
       const workflowSnapshot = await NeoScaffold.export();
+      if (!workflowSnapshot) {
+        return;
+      }
+      const nodeIds = [];
+
+      if (!canvas.selected_nodes || Object.keys(canvas.selected_nodes).length === 0) {
+        alert('No nodes selected');
+        return;
+      }
+      Object.keys(canvas.selected_nodes).forEach((nodeId) => {
+        nodeIds.push(nodeId);
+
+        if (canvas.onNodeDeselected) {
+          canvas.onNodeDeselected(canvas.selected_nodes[nodeId]);
+        }
+      });
+      canvas.selected_nodes = {};
+
+      canvas.current_node = null;
+      canvas.highlighted_links = {};
+      canvas.setDirty(true);
+      canvas.graph.afterChange();
+      await NeoScaffold.api.postStepThroughBreakpoints(workflowSnapshot.checksum, nodeIds);
+    },
+
+    async toggleBreakpoints(canvas, allBreak) {
+      const workflowSnapshot = await NeoScaffold.export();
+      if (allBreak) {
+        return NeoScaffold.api.postToggleBreakpoints(workflowSnapshot.checksum, [], allBreak);
+      }
 
       if (workflowSnapshot) {
         graph = canvas.graph;
@@ -1435,16 +1530,20 @@
         canvas.graph.afterChange();
 
         const nodeIds = Object.keys(canvas.breakpoints[workflowSnapshot.checksum]);
-        await NeoScaffold.api.postToggleBreakpoints(workflowSnapshot.checksum, nodeIds);
+        await NeoScaffold.api.postToggleBreakpoints(workflowSnapshot.checksum, nodeIds, allBreak);
       }
     },
 
-    async stepThroughBreakpoints(canvas) {
+    async toggleStopPoints(canvas, allStop) {
       const workflowSnapshot = await NeoScaffold.export();
       if (!workflowSnapshot) {
         return;
       }
       const nodeIds = [];
+
+      if (allStop) {
+        return NeoScaffold.api.postToggleStop(workflowSnapshot.checksum, [], allStop);
+      }
 
       if (!canvas.selected_nodes || Object.keys(canvas.selected_nodes).length === 0) {
         alert('No nodes selected');
@@ -1463,7 +1562,37 @@
       canvas.highlighted_links = {};
       canvas.setDirty(true);
       canvas.graph.afterChange();
-      await NeoScaffold.api.postStepThroughBreakpoints(workflowSnapshot.checksum, nodeIds);
+      await NeoScaffold.api.postToggleStop(workflowSnapshot.checksum, nodeIds, allStop);
+    },
+
+    async toggleRestartPoints(canvas, allRestart) {
+      const workflowSnapshot = await NeoScaffold.export();
+      if (!workflowSnapshot) {
+        return;
+      }
+      const nodeIds = [];
+      if (allRestart) {
+        return NeoScaffold.api.postToggleRestart(workflowSnapshot.checksum, [], allRestart);
+      }
+
+      if (!canvas.selected_nodes || Object.keys(canvas.selected_nodes).length === 0) {
+        alert('No nodes selected');
+        return;
+      }
+      Object.keys(canvas.selected_nodes).forEach((nodeId) => {
+        nodeIds.push(nodeId);
+
+        if (canvas.onNodeDeselected) {
+          canvas.onNodeDeselected(canvas.selected_nodes[nodeId]);
+        }
+      });
+      canvas.selected_nodes = {};
+
+      canvas.current_node = null;
+      canvas.highlighted_links = {};
+      canvas.setDirty(true);
+      canvas.graph.afterChange();
+      await NeoScaffold.api.postToggleRestart(workflowSnapshot.checksum, nodeIds, allRestart);
     },
 
     addExtraMenuOptions(canvas) {
@@ -1471,40 +1600,16 @@
       canvas.getExtraMenuOptions = function(_, options) {
         options.push(
           {
-            content: 'Queue Workflow',
-            callback: () => {
-              NeoScaffold.queuePrompt(1);
-            },
+            content: 'Pause',
+            callback: () => NeoScaffold.toggleBreakpoints(canvas, true)
           },
           {
-            content: 'Export Workflow',
-            callback: () => {
-              NeoScaffold.exportWorkflow();
-            },
+            content: 'Stop',
+            callback: () => NeoScaffold.toggleStopPoints(canvas, true)
           },
           {
-            content: 'Import Workflow',
-            callback: () => {
-              document.getElementById('workflow-input').click()
-            },
-          },
-          {
-            content: 'Toggle Breakpoints',
-            callback: () => {
-              NeoScaffold.toggleBreakpoints(canvas);
-            },
-          },
-          {
-            content: 'Step Through Breakpoints',
-            callback: () => {
-              NeoScaffold.stepThroughBreakpoints(canvas);
-            },
-          },
-          {
-            content: 'Clear All',
-            callback: () => {
-              NeoScaffold.clean();
-            },
+            content: 'Restart',
+            callback: () => NeoScaffold.toggleRestartPoints(canvas, true)
           },
         );
       };
@@ -1544,6 +1649,14 @@
         {
           label: 'Step Through Breakpoints',
           callback: () => NeoScaffold.stepThroughBreakpoints(canvas)
+        },
+        {
+          label: 'Toggle Stop Points',
+          callback: () => NeoScaffold.toggleStopPoints(canvas)
+        },
+        {
+          label: 'Toggle Restart Points',
+          callback: () => NeoScaffold.toggleRestartPoints(canvas)
         },
         {
           label: 'Clear',

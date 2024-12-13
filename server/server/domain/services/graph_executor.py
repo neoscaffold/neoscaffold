@@ -121,24 +121,84 @@ async def sequential_runtime_step(
 
     node_id = action.get("node_id")
 
-    breakpoints = (
+    # TODO: refactor this section to be less repetitive and more readable
+    interventions = (
         server.sessions.get(server.client_id, {})
         .get(server.current_workflow_id, {})
-        .get("breakpoints", {})
+        .get("interventions", {})
     )
-    if breakpoints.get("last_modified"):
+
+    breakpoints = interventions.get("breakpoints")
+    if breakpoints:
+        # all_break is a flag that breaks the workflow at the current node
+        all_break = breakpoints.get("all_break", False)
+
         in_list = node_id in breakpoints.get("nodes", {})
-        if in_list:
+        if in_list or all_break:
             # notify the client that the execution has been paused at this node
             await server.send_json(
                 event="message",
                 data={"breakpoint": node_id},
                 sid=server.client_id,
             )
+
+            if all_break:
+                # reset the all_break flag
+                breakpoints["all_break"] = False
+                if not in_list:
+                    # create a new event
+                    breakpoints["nodes"][node_id] = asyncio.Event()
+
             # check if the event has been set
             event = breakpoints["nodes"][node_id]
             event.clear()
             await event.wait()
+
+    restart_points = interventions.get("restart-points")
+    if restart_points:
+        # all_restart is a flag that restarts the workflow to the first node
+        all_restart = restart_points.get("all_restart", False)
+
+        in_list = node_id in restart_points.get("nodes", {})
+        if in_list or all_restart:
+            # notify the client that the execution has been paused at this node
+            await server.send_json(
+                event="message",
+                data={"restart-point": node_id},
+                sid=server.client_id,
+            )
+            # restart the graph from the first node
+            evaluation_override_actions[node_id] = EvaluationAction(
+                node_id=node_id,
+                runtime_action=RuntimeAction.GOTO,
+                destination_node_id=graph_nodes[0],
+            ).to_dict()
+
+            # reset the all_restart flag
+            restart_points["all_restart"] = False
+
+    stop_points = interventions.get("stop-points")
+    if stop_points:
+        # handle stop points
+
+        # all_stop is a flag that stops the workflow at the last node
+        all_stop = stop_points.get("all_stop", False)
+
+        in_list = node_id in stop_points.get("nodes", {})
+        if in_list or all_stop:
+            # notify the client that the execution has been stopped
+            await server.send_json(
+                event="message",
+                data={"stop-point": node_id},
+                sid=server.client_id,
+            )
+            # set the runtime action to return
+            evaluation_override_actions[node_id] = EvaluationAction(
+                node_id=node_id, runtime_action=RuntimeAction.RETURN
+            ).to_dict()
+
+            # reset the all_stop flag
+            stop_points["all_stop"] = False
 
     # override the action if there is an override for it planned
     if node_id in evaluation_override_actions:

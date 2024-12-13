@@ -1,14 +1,92 @@
 import asyncio
+import json
 from aiohttp import web
 
 from ...domain.utilities.verify_google_token import verify_google_token
 from ...domain.utilities.authorize_user_and_get_info import authorize_user_and_get_info
+from ...domain.utilities.fallback_json_encoder import dumps
 
 
 def base_routes(server):
     routes = server.routes
 
-    @routes.post("/breakpoints/step-through")
+    @routes.post("/interventions/stop-points")
+    async def toggle_stop_points(request):
+        info = authorize_user_and_get_info(request)
+
+        if isinstance(info, web.Response):
+            return info
+
+        user_info = info.get("user_info", {})
+
+        user_id = user_info.get("user_id")
+        if not user_id:
+            return web.json_response({"error": "No user id"}, status=401)
+
+        json_data = await request.json()
+
+        if "workflow_id" in json_data and ("node_ids" in json_data):
+            workflow_session = server.toggle_stop_points(
+                client_id=user_id,
+                workflow_id=json_data.get("workflow_id"),
+                node_ids=json_data.get("node_ids"),
+                all_stop=json_data.get("all_stop", False)
+            )
+            server.logger.info(workflow_session)
+
+            return web.json_response(
+                {
+                    "user_id": user_id,
+                    "workflow_id": json_data.get("workflow_id"),
+                    "workflow_session": workflow_session,
+                    "node_ids": json_data.get("node_ids"),
+                },
+                dumps=dumps
+            )
+        else:
+            return web.json_response(
+                {"error": "no prompt", "node_errors": []}, status=400
+            )
+
+    @routes.post("/interventions/restart-points")
+    async def toggle_restart_points(request):
+        info = authorize_user_and_get_info(request)
+
+        if isinstance(info, web.Response):
+            return info
+
+        user_info = info.get("user_info", {})
+
+        user_id = user_info.get("user_id")
+        if not user_id:
+            return web.json_response({"error": "No user id"}, status=401)
+
+        json_data = await request.json()
+
+        if "workflow_id" in json_data and ("node_ids" in json_data):
+            workflow_session = server.toggle_restart_points(
+                client_id=user_id,
+                workflow_id=json_data.get("workflow_id"),
+                node_ids=json_data.get("node_ids"),
+                all_restart=json_data.get("all_restart", False)
+            )
+            server.logger.info(workflow_session)
+
+            return web.json_response(
+                {
+                    "user_id": user_id,
+                    "workflow_id": json_data.get("workflow_id"),
+                    "workflow_session": workflow_session,
+                    "node_ids": json_data.get("node_ids"),
+                },
+                dumps=dumps
+            )
+        else:
+            return web.json_response(
+                {"error": "no prompt", "node_errors": []}, status=400
+            )
+
+    @routes.post("/interventions/breakpoints/step-through")
     async def step_through_breakpoints(request):
         info = authorize_user_and_get_info(request)
 
@@ -24,25 +102,29 @@ def base_routes(server):
         json_data = await request.json()
 
         if "workflow_id" in json_data and ("node_ids" in json_data):
-            workflow_with_breakpoints = server.step_through_breakpoints(
-                user_id, json_data.get("workflow_id"), json_data.get("node_ids")
+            workflow_session = server.step_through_breakpoints(
+                client_id=user_id,
+                workflow_id=json_data.get("workflow_id"),
+                node_ids=json_data.get("node_ids")
             )
-            server.logger.info(workflow_with_breakpoints)
+            server.logger.info(workflow_session)
 
             return web.json_response(
                 {
                     "user_id": user_id,
                     "workflow_id": json_data.get("workflow_id"),
+                    "workflow_session": workflow_session,
                     "node_ids": json_data.get("node_ids"),
-                }
+                },
+                dumps=dumps
             )
         else:
             return web.json_response(
                 {"error": "no prompt", "node_errors": []}, status=400
             )
 
-    @routes.post("/breakpoints")
-    async def post_breakpoints(request):
+    @routes.post("/interventions/breakpoints")
+    async def toggle_breakpoints(request):
         info = authorize_user_and_get_info(request)
 
         if isinstance(info, web.Response):
@@ -57,17 +139,22 @@ def base_routes(server):
         json_data = await request.json()
 
         if "workflow_id" in json_data and ("node_ids" in json_data):
-            workflow_with_breakpoints = server.toggle_breakpoints(
-                user_id, json_data.get("workflow_id"), json_data.get("node_ids")
+            workflow_session = server.toggle_breakpoints(
+                client_id=user_id,
+                workflow_id=json_data.get("workflow_id"),
+                node_ids=json_data.get("node_ids"),
+                all_break=json_data.get("all_break", False)
             )
-            server.logger.info(workflow_with_breakpoints)
+            server.logger.info(workflow_session)
 
             return web.json_response(
                 {
                     "user_id": user_id,
                     "workflow_id": json_data.get("workflow_id"),
+                    "workflow_session": workflow_session,
                     "node_ids": json_data.get("node_ids"),
-                }
+                },
+                dumps=dumps
             )
         else:
             return web.json_response(

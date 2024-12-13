@@ -206,11 +206,13 @@ class Server:
             self.sessions[client_id] = {}
         return self.sessions[client_id]
 
-    def get_or_create_workflow(self, client_id, workflow_id):
+    def get_or_create_workflow_session(self, client_id, workflow_id):
         session = self.get_or_create_session(client_id)
 
         if workflow_id not in session:
-            session[workflow_id] = {}
+            session[workflow_id] = {
+                "interventions": {}
+            }
 
         return session[workflow_id]
 
@@ -345,43 +347,103 @@ class Server:
                 f"Skip {module.__name__} module for custom extensions due to the lack of EXTENSION_MAPPINGS."
             )
 
-    def toggle_breakpoints(self, client_id, workflow_id, node_ids=[]):
-        workflow = self.get_or_create_workflow(client_id, workflow_id)
+    def toggle_breakpoints(self, client_id, workflow_id, node_ids=[], all_break=False):
+        workflow_session = self.get_or_create_workflow_session(client_id, workflow_id)
 
-        if "breakpoints" not in workflow:
-            workflow["breakpoints"] = {"last_modified": time.time(), "nodes": {}}
+        # allowed to raise an error if the interventions are not set
+        interventions = workflow_session["interventions"]
 
-        if "nodes" not in workflow["breakpoints"]:
-            workflow["breakpoints"]["nodes"] = {}
+        if "breakpoints" not in interventions:
+            interventions["breakpoints"] = {"last_modified": time.time(), "nodes": {}}
+
+        breakpoints = interventions["breakpoints"]
+
+        if "nodes" not in breakpoints:
+            breakpoints["nodes"] = {}
+
+        breakpoints["all_break"] = all_break
 
         for node_id in node_ids:
-            if node_id in workflow["breakpoints"]["nodes"]:
-                event = workflow["breakpoints"]["nodes"][node_id]
+            if node_id in breakpoints["nodes"]:
+                event = breakpoints["nodes"][node_id]
                 event.clear()
-                del workflow["breakpoints"]["nodes"][node_id]
+                del breakpoints["nodes"][node_id]
             else:
-                workflow["breakpoints"]["nodes"][node_id] = asyncio.Event()
+                breakpoints["nodes"][node_id] = asyncio.Event()
 
-        return workflow
+        return workflow_session
 
     def step_through_breakpoints(self, client_id, workflow_id, node_ids=[]):
-        workflow = self.get_or_create_workflow(client_id, workflow_id)
+        workflow_session = self.get_or_create_workflow_session(client_id, workflow_id)
 
-        if "breakpoints" not in workflow:
-            workflow["breakpoints"] = {"last_modified": time.time(), "nodes": {}}
+        # allowed to raise an error if the interventions are not set
+        interventions = workflow_session["interventions"]
 
-        if "nodes" not in workflow["breakpoints"]:
-            workflow["breakpoints"]["nodes"] = {}
+        if "breakpoints" not in interventions:
+            interventions["breakpoints"] = {"last_modified": time.time(), "nodes": {}}
+
+        breakpoints = interventions["breakpoints"]
+
+        if "nodes" not in breakpoints:
+            breakpoints["nodes"] = {}
 
         for node_id in node_ids:
-            if node_id in workflow["breakpoints"]["nodes"]:
-                event = workflow["breakpoints"]["nodes"][node_id]
+            if node_id in breakpoints["nodes"]:
+                event = breakpoints["nodes"][node_id]
                 if not event.is_set():
                     event.set()
                 else:
                     event.clear()
 
-        return workflow
+        return workflow_session
+
+    def toggle_stop_points(self, client_id, workflow_id, node_ids=[], all_stop=False):
+        workflow_session = self.get_or_create_workflow_session(client_id, workflow_id)
+
+        # allowed to raise an error if the interventions are not set
+        interventions = workflow_session["interventions"]
+
+        if "stop-points" not in interventions:
+            interventions["stop-points"] = {"last_modified": time.time(), "nodes": {}}
+
+        stop_points = interventions["stop-points"]
+
+        if "nodes" not in stop_points:
+            stop_points["nodes"] = {}
+
+        stop_points["all_stop"] = all_stop
+
+        for node_id in node_ids:
+            if node_id in stop_points["nodes"]:
+                del stop_points["nodes"][node_id]
+            else:
+                stop_points["nodes"][node_id] = True
+
+        return workflow_session
+
+    def toggle_restart_points(self, client_id, workflow_id, node_ids=[], all_restart=False):
+        workflow_session = self.get_or_create_workflow_session(client_id, workflow_id)
+
+        # allowed to raise an error if the interventions are not set
+        interventions = workflow_session["interventions"]
+
+        if "restart-points" not in interventions:
+            interventions["restart-points"] = {"last_modified": time.time(), "nodes": {}}
+
+        restart_points = interventions["restart-points"]
+
+        restart_points["all_restart"] = all_restart
+
+        if "nodes" not in restart_points:
+            restart_points["nodes"] = {}
+
+        for node_id in node_ids:
+            if node_id in restart_points["nodes"]:
+                del restart_points["nodes"][node_id]
+            else:
+                restart_points["nodes"][node_id] = True
+
+        return workflow_session
 
     def add_on_prompt_handler(self, handler):
         self.on_prompt_handlers.append(handler)
