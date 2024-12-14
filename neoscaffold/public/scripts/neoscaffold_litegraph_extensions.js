@@ -300,10 +300,13 @@
               let selectedNodes = scope.instance.litegraphCanvas.selected_nodes;
               selectedNodes[node.id] = node;
 
+              NeoScaffold['isPaused'] = true;
+
               NeoScaffold.graph.setDirtyCanvas(true);
               return;
             }
           }
+          NeoScaffold['isPaused'] = false;
 
           if (data.node_errors && data.node_errors.length) {
             let node = NeoScaffold.graph.getNodeById(data.evaluation_action.node_id);
@@ -490,6 +493,7 @@
 
       scope.addExtraMenuOptions(canvas);
       scope.addSideMenuOptions(canvas);
+      scope.addRuntimeButtons(canvas);
 
       scope.litegraphCanvas = canvas;
       canvas.canvas.width = window.innerWidth;
@@ -1595,10 +1599,80 @@
       await NeoScaffold.api.postToggleRestart(workflowSnapshot.checksum, nodeIds, allRestart);
     },
 
+    /**
+     * Creates a 4 button toolbar which is fixed 50px from the bottom of the screen which contains the following buttons:
+     * - Play
+     * - Pause
+     * - Stop
+     * - Restart
+     * @param {LiteGraphCanvas} canvas
+     */
+    addRuntimeButtons(canvas) {
+      // create a toolbar container
+      const toolbar = document.createElement('div');
+      toolbar.style.position = 'fixed';
+      toolbar.style.bottom = '50px';
+      toolbar.style.left = '50%';
+      toolbar.style.transform = 'translateX(-50%)';
+      toolbar.style.zIndex = '1000';
+      toolbar.style.display = 'flex';
+      toolbar.style.justifyContent = 'center';
+      toolbar.style.alignItems = 'center';
+
+      // add buttons to the toolbar
+      const buttons = [
+        {
+          content: '▶️',
+          async callback() {
+            // if paused, resume
+            if (NeoScaffold['isPaused']) {
+              await NeoScaffold.stepThroughBreakpoints(canvas);
+            } else {
+              await NeoScaffold.queuePrompt(1);
+            }
+          }
+        },
+        {
+          content: '⏸️',
+          callback: () => NeoScaffold.toggleBreakpoints(canvas, true)
+        },
+        {
+          content: '⏹️',
+          callback: () => NeoScaffold.toggleStopPoints(canvas, true)
+        },
+        {
+          content: '🔄',
+          callback: () => NeoScaffold.toggleRestartPoints(canvas, true)
+        },
+      ];
+
+      buttons.forEach((button) => {
+        const buttonElement = document.createElement('button');
+        buttonElement.innerText = button.content;
+        buttonElement.style.margin = '0 5px';
+        buttonElement.style.padding = '10px';
+        buttonElement.style.borderRadius = '5px';
+        buttonElement.style.border = 'none';
+        buttonElement.style.backgroundColor = '#3c3c3c';
+        buttonElement.style.color = '#fff';
+        buttonElement.style.cursor = 'pointer';
+        buttonElement.addEventListener('click', button.callback);
+        toolbar.appendChild(buttonElement);
+      });
+
+      document.body.appendChild(toolbar);
+
+      return toolbar;
+    },
+
     addExtraMenuOptions(canvas) {
       // additional menu options
       canvas.getExtraMenuOptions = function(_, options) {
         options.push(
+          {
+            content: 'Play',
+            callback: () => NeoScaffold.queuePrompt(1)
+          },
           {
             content: 'Pause',
             callback: () => NeoScaffold.toggleBreakpoints(canvas, true)
