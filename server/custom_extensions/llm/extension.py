@@ -45,8 +45,8 @@ class OpenAI_LLM:
 
     # OUTPUT TYPES
     OUTPUT = {
-        "kind": "any",
-        "name": "any",
+        "kind": "*",
+        "name": "*",
         "cacheable": False,
     }
 
@@ -136,8 +136,8 @@ class Anthropic_LLM:
 
     # OUTPUT TYPES
     OUTPUT = {
-        "kind": "any",
-        "name": "any",
+        "kind": "*",
+        "name": "*",
         "cacheable": False,
     }
 
@@ -206,8 +206,8 @@ class Perplexity_LLM:
 
     # OUTPUT TYPES
     OUTPUT = {
-        "kind": "any",
-        "name": "any",
+        "kind": "*",
+        "name": "*",
         "cacheable": False,
     }
 
@@ -294,8 +294,8 @@ class Cohere_LLM:
 
     # OUTPUT TYPES
     OUTPUT = {
-        "kind": "any",
-        "name": "any",
+        "kind": "*",
+        "name": "*",
         "cacheable": False,
     }
 
@@ -365,8 +365,8 @@ class Cerebras_LLM:
 
     # OUTPUT TYPES
     OUTPUT = {
-        "kind": "any",
-        "name": "any",
+        "kind": "*",
+        "name": "*",
         "cacheable": False,
     }
 
@@ -433,8 +433,8 @@ class Groq_LLM:
 
     # OUTPUT TYPES
     OUTPUT = {
-        "kind": "any",
-        "name": "any",
+        "kind": "*",
+        "name": "*",
         "cacheable": False,
     }
 
