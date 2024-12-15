@@ -273,6 +273,43 @@ class nsArray:
 
         return self.data
 
+class nsArrayAppend:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Appends an element to an array"
+
+    # INPUT TYPES
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+            "element": {
+                "kind": "*",
+                "name": "element",
+            },
+        },
+    }
+
+    # OUTPUT TYPES
+    OUTPUT = {
+        "kind": "array",
+        "name": "array",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        if node_inputs.get("required_inputs"):
+            if "array" in node_inputs.get("required_inputs"):
+                self.array = node_inputs.get("required_inputs").get("array").get("values")
+            if "element" in node_inputs.get("required_inputs"):
+                self.element = node_inputs.get("required_inputs").get("element").get("values")
+
+        self.array.append(self.element)
+
+        return self.array
+
 
 class IfEqual:
     CATEGORY = "utilities"
@@ -285,12 +322,10 @@ class IfEqual:
             "a": {
                 "kind": "*",
                 "name": "a",
-                "widget": {"kind": "*", "name": "a", "default": ""},
             },
             "b": {
                 "kind": "*",
                 "name": "b",
-                "widget": {"kind": "*", "name": "b", "default": ""},
             },
         },
     }
@@ -404,14 +439,12 @@ class IfEqualTrue:
             "IfEqual": {
                 "kind": "*",
                 "name": "IfEqual",
-                "widget": {"kind": "*", "name": "IfEqual", "default": ""},
             }
         },
         "optional_inputs": {
             "node_inputs": {
                 "kind": "*",
                 "name": "node_inputs",
-                "widget": {"kind": "*", "name": "node_inputs", "default": ""},
             }
         },
     }
@@ -438,14 +471,12 @@ class IfEqualFalse:
             "IfEqual": {
                 "kind": "*",
                 "name": "IfEqual",
-                "widget": {"kind": "*", "name": "IfEqual", "default": ""},
             }
         },
         "optional_inputs": {
             "node_inputs": {
                 "kind": "*",
                 "name": "node_inputs",
-                "widget": {"kind": "*", "name": "node_inputs", "default": ""},
             }
         },
     }
@@ -472,14 +503,12 @@ class EndIfEqual:
             "IfEqual": {
                 "kind": "*",
                 "name": "IfEqual",
-                "widget": {"kind": "*", "name": "IfEqual", "default": ""},
             }
         },
         "optional_inputs": {
             "node_inputs": {
                 "kind": "*",
                 "name": "node_inputs",
-                "widget": {"kind": "*", "name": "node_inputs", "default": ""},
             }
         },
     }
@@ -615,7 +644,6 @@ class BreakWhileLoop:
             "node_inputs": {
                 "kind": "*",
                 "name": "node_inputs",
-                "widget": {"kind": "*", "name": "node_inputs", "default": ""},
             },
         }
     }
@@ -720,7 +748,6 @@ class ContinueWhileLoop:
             "node_inputs": {
                 "kind": "*",
                 "name": "node_inputs",
-                "widget": {"kind": "*", "name": "node_inputs", "default": ""},
             },
         }
     }
@@ -806,7 +833,6 @@ class EndWhileLoop:
             "node_inputs": {
                 "kind": "*",
                 "name": "node_inputs",
-                "widget": {"kind": "*", "name": "node_inputs", "default": ""},
             },
         }
     }
@@ -22122,6 +22148,11 @@ EXTENSION_MAPPINGS = {
             "python_class": nsArray,
             "javascript_class_name": "nsArray",
             "display_name": "Array",
+        },
+        "nsArrayAppend": {
+            "python_class": nsArrayAppend,
+            "javascript_class_name": "nsArrayAppend",
+            "display_name": "ArrayAppend",
         },
         "IfEqual": {
             "python_class": IfEqual,

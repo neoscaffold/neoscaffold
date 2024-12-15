@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 import ssl
 import asyncio
@@ -14,6 +15,7 @@ from io import BytesIO
 
 from PIL import Image, ImageOps
 from ...domain.services.graph_executor import GraphExecutor
+from ...domain.utilities.fallback_json_encoder import FallbackJSONEncoder
 from ..apis.base_routes import base_routes
 from ..apis.websocket_routes import base_websocket
 
@@ -159,9 +161,9 @@ class Server:
         if sid is None:
             sockets = list(self.sockets.values())
             for ws in sockets:
-                await self.try_send_socket(ws.send_json, message)
+                await self.try_send_socket(ws.send_json, json.dumps(message, cls=FallbackJSONEncoder))
         elif sid in self.sockets:
-            await self.try_send_socket(self.sockets[sid].send_json, message)
+            await self.try_send_socket(self.sockets[sid].send_json, json.dumps(message, cls=FallbackJSONEncoder))
 
     def send_sync(self, event, data, sid=None):
         self.loop.call_soon_threadsafe(

@@ -16,7 +16,27 @@ class CastedLinear:
     DESCRIPTION = "CastedLinear, fully connected layer with casted weights"
 
     # INPUT TYPES
-    INPUT = {}
+    INPUT = {
+        "required_inputs": {
+            "in_features": {
+                "kind": "number",
+                "name": "in_features",
+                "widget": {"kind": "number", "name": "in_features", "default": ""},
+            },
+            "out_features": {
+                "kind": "number",
+                "name": "out_features",
+                "widget": {"kind": "number", "name": "out_features", "default": ""},
+            }
+        },
+        "optional_inputs": {
+            "bias": {
+                "kind": "boolean",
+                "name": "bias",
+                "widget": {"kind": "toggle", "name": "bias", "default": False},
+            }
+        }
+    }
 
     # OUTPUT TYPES
     OUTPUT = {
@@ -68,14 +88,14 @@ class RotaryEmbedding:
     INPUT = {
         "required_inputs": {
             "dim": {
-                "kind": "*",
+                "kind": "number",
                 "name": "dim",
-                "widget": {"kind": "*", "name": "dim", "default": ""},
+                "widget": {"kind": "number", "name": "dim", "default": ""},
             },
             "base": {
-                "kind": "*",
+                "kind": "number",
                 "name": "base",
-                "widget": {"kind": "*", "name": "base", "default": ""},
+                "widget": {"kind": "number", "name": "base", "default": 10000},
             },
         },
     }
@@ -132,44 +152,34 @@ class CausalSelfAttention:
     INPUT = {
         "required_inputs": {
             "dim": {
-                "kind": "*",
+                "kind": "number",
                 "name": "dim",
-                "widget": {"kind": "*", "name": "dim", "default": ""},
+                "widget": {"kind": "number", "name": "dim", "default": ""},
             },
             "num_heads": {
-                "kind": "*",
+                "kind": "number",
                 "name": "num_heads",
-                "widget": {"kind": "*", "name": "num_heads", "default": ""},
+                "widget": {"kind": "number", "name": "num_heads", "default": ""},
             },
             "query_linear": {
                 "kind": "*",
                 "name": "query_linear",
-                "widget": {"kind": "*", "name": "query_linear", "default": ""},
             },
             "keys_linear": {
                 "kind": "*",
                 "name": "keys_linear",
-                "widget": {"kind": "*", "name": "keys_linear", "default": ""},
             },
             "values_linear": {
                 "kind": "*",
                 "name": "values_linear",
-                "widget": {"kind": "*", "name": "values_linear", "default": ""},
-            },
-            "lambdas": {
-                "kind": "*",
-                "name": "lambdas",
-                "widget": {"kind": "*", "name": "lambdas", "default": ""},
             },
             "rotary": {
                 "kind": "*",
                 "name": "rotary",
-                "widget": {"kind": "*", "name": "rotary", "default": ""},
             },
             "context_linear": {
                 "kind": "*",
                 "name": "context_linear",
-                "widget": {"kind": "*", "name": "context_linear", "default": ""},
             },
         },
     }
@@ -198,16 +208,13 @@ class CausalSelfAttention:
             if "values_linear" in node_inputs.get("required_inputs"):
                 self.input_values_linear = node_inputs.get("required_inputs").get("values_linear").get("values")
 
-            if "lambdas" in node_inputs.get("required_inputs"):
-                self.input_lambdas = node_inputs.get("required_inputs").get("lambdas").get("values")
-
             if "rotary" in node_inputs.get("required_inputs"):
                 self.input_rotary = node_inputs.get("required_inputs").get("rotary").get("values")
 
             if "context_linear" in node_inputs.get("required_inputs"):
                 self.input_context_linear = node_inputs.get("required_inputs").get("context_linear").get("values")
 
-        from torch import nn
+        from torch import nn, tensor
         from torch.nn.functional import rms_norm
         from torch.nn.attention.flex_attention import flex_attention
 
@@ -222,7 +229,6 @@ class CausalSelfAttention:
                 casted_queries,
                 casted_keys,
                 casted_values,
-                lambdas,
                 rotary,
                 casted_projection
             ):
@@ -232,7 +238,7 @@ class CausalSelfAttention:
                 self.casted_queries = casted_queries # CastedLinear(dim, dim)
                 self.casted_keys = casted_keys # CastedLinear(dim, dim)
                 self.casted_values = casted_values # CastedLinear(dim, dim)
-                self.lambdas = lambdas # nn.Parameter(tensor([0.5, 0.5]))
+                self.lambdas = nn.Parameter(tensor([0.5, 0.5]))
                 self.rotary = rotary # RotaryEmbedding(dim // num_heads)
                 self.casted_projection = casted_projection # CastedLinear(dim, dim)
                 self.casted_projection.weight.data.zero_()
@@ -264,12 +270,11 @@ class CausalSelfAttention:
             casted_queries=self.input_query_linear,
             casted_keys=self.input_keys_linear,
             casted_values=self.input_values_linear,
-            lambdas=self.input_lambdas,
             rotary=self.input_rotary,
             casted_projection=self.input_context_linear
         )
 
-class MLP:
+class MultiLayerPerceptron:
     CATEGORY = "torch"
     SUBCATEGORY = "neural_networks"
     DESCRIPTION = "MLP, Multi Layer Perceptron"
@@ -277,19 +282,17 @@ class MLP:
     INPUT = {
         "required_inputs": {
             "dim": {
-                "kind": "*",
+                "kind": "number",
                 "name": "dim",
-                "widget": {"kind": "*", "name": "dim", "default": ""},
+                "widget": {"kind": "number", "name": "dim", "default": ""},
             },
             "casted_fully_connected": {
                 "kind": "*",
                 "name": "casted_fully_connected",
-                "widget": {"kind": "*", "name": "casted_fully_connected", "default": ""},
             },
             "casted_up_projection": {
                 "kind": "*",
                 "name": "casted_up_projection",
-                "widget": {"kind": "*", "name": "casted_up_projection", "default": ""},
             },
         },
     }
@@ -336,7 +339,7 @@ class MLP:
             casted_up_projection=self.input_casted_up_projection
         )
 
-class Block:
+class TransformerBlock:
     CATEGORY = "torch"
     SUBCATEGORY = "neural_networks"
     DESCRIPTION = "Block, Transformer Block"
@@ -346,18 +349,11 @@ class Block:
             "causal_self_attention": {
                 "kind": "*",
                 "name": "causal_self_attention",
-                "widget": {"kind": "*", "name": "causal_self_attention", "default": ""},
             },
-            "mlp": {
+            "multi_layer_perceptron": {
                 "kind": "*",
-                "name": "mlp",
-                "widget": {"kind": "*", "name": "mlp", "default": ""},
-            },
-            "lambdas": {
-                "kind": "*",
-                "name": "lambdas",
-                "widget": {"kind": "*", "name": "lambdas", "default": ""},
-            },
+                "name": "multi_layer_perceptron",
+            }
         },
     }
 
@@ -372,14 +368,12 @@ class Block:
             if "causal_self_attention" in node_inputs.get("required_inputs"):
                 self.input_causal_self_attention = node_inputs.get("required_inputs").get("causal_self_attention").get("values")
 
-            if "mlp" in node_inputs.get("required_inputs"):
-                self.input_mlp = node_inputs.get("required_inputs").get("mlp").get("values")
+            if "multi_layer_perceptron" in node_inputs.get("required_inputs"):
+                self.input_multi_layer_perceptron = node_inputs.get("required_inputs").get("multi_layer_perceptron").get("values")
 
-            if "lambdas" in node_inputs.get("required_inputs"):
-                self.input_lambdas = node_inputs.get("required_inputs").get("lambdas").get("values")
-
-        from torch import nn
+        from torch import nn, tensor
         from torch.nn.functional import rms_norm
+
         def norm(x):
             return rms_norm(x, (x.size(-1),))
 
@@ -387,13 +381,12 @@ class Block:
             def __init__(
                 self,
                 causal_self_attention,
-                mlp,
-                lambdas
+                multi_layer_perceptron
             ):
                 super().__init__()
                 self.causal_self_attention = causal_self_attention
-                self.mlp = mlp
-                self.lambdas = lambdas
+                self.multi_layer_perceptron = multi_layer_perceptron
+                self.lambdas = nn.Parameter(tensor([1., 0.]))
 
             def forward(
                 self,
@@ -404,13 +397,12 @@ class Block:
             ):
                 x = self.lambdas[0] * x + self.lambdas[1] * x0
                 x = x + self.causal_self_attention(norm(x), vi, block_mask)
-                x = x + self.mlp(norm(x))
+                x = x + self.multi_layer_perceptron(norm(x))
                 return x
 
         return BlockModule(
             causal_self_attention=self.input_causal_self_attention,
-            mlp=self.input_mlp,
-            lambdas=self.input_lambdas
+            multi_layer_perceptron=self.input_multi_layer_perceptron
         )
 
 
@@ -422,14 +414,14 @@ class ValueEmbedding:
     INPUT = {
         "required_inputs": {
             "vocab_size": {
-                "kind": "*",
+                "kind": "number",
                 "name": "vocab_size",
-                "widget": {"kind": "*", "name": "vocab_size", "default": ""},
+                "widget": {"kind": "number", "name": "vocab_size", "default": ""},
             },
             "model_dim": {
-                "kind": "*",
+                "kind": "number",
                 "name": "model_dim",
-                "widget": {"kind": "*", "name": "model_dim", "default": ""},
+                "widget": {"kind": "number", "name": "model_dim", "default": ""},
             },
         },
     }
@@ -473,50 +465,47 @@ class GPT2:
 
     INPUT = {
         "required_inputs": {
-            "vocab_size": {
-                "kind": "*",
-                "name": "vocab_size",
-                "widget": {"kind": "*", "name": "vocab_size", "default": ""},
-            },
-            "num_layers": {
-                "kind": "*",
-                "name": "num_layers",
-                "widget": {"kind": "*", "name": "num_layers", "default": ""},
-            },
-            "num_heads": {
-                "kind": "*",
-                "name": "num_heads",
-                "widget": {"kind": "*", "name": "num_heads", "default": ""},
-            },
-            "model_dim": {
-                "kind": "*",
-                "name": "model_dim",
-                "widget": {"kind": "*", "name": "model_dim", "default": ""},
-            },
             "block_list": {
                 "kind": "*",
                 "name": "block_list",
-                "widget": {"kind": "*", "name": "block_list", "default": ""},
             },
             "value_embeds": {
                 "kind": "*",
                 "name": "value_embeds",
-                "widget": {"kind": "*", "name": "value_embeds", "default": ""},
             },
             "language_model_head": {
                 "kind": "*",
                 "name": "language_model_head",
-                "widget": {"kind": "*", "name": "language_model_head", "default": ""},
+            },
+            "num_heads": {
+                "kind": "number",
+                "name": "num_heads",
+                "widget": {"kind": "number", "name": "num_heads", "default": ""},
+            },
+            "model_dim": {
+                "kind": "number",
+                "name": "model_dim",
+                "widget": {"kind": "number", "name": "model_dim", "default": ""},
             },
             "block_size": {
-                "kind": "*",
+                "kind": "number",
                 "name": "block_size",
-                "widget": {"kind": "*", "name": "block_size", "default": ""},
+                "widget": {"kind": "number", "name": "block_size", "default": ""},
+            },
+            "vocab_size": {
+                "kind": "number",
+                "name": "vocab_size",
+                "widget": {"kind": "number", "name": "vocab_size", "default": ""},
             },
             "vocab_max_size": {
-                "kind": "*",
+                "kind": "number",
                 "name": "vocab_max_size",
-                "widget": {"kind": "*", "name": "vocab_max_size", "default": ""},
+                "widget": {"kind": "number", "name": "vocab_max_size", "default": ""},
+            },
+            "num_layers": {
+                "kind": "number",
+                "name": "num_layers",
+                "widget": {"kind": "number", "name": "num_layers", "default": ""},
             },
         },
     }
@@ -695,11 +684,433 @@ class GPT2:
             vocab_max_size=self.input_vocab_max_size
         )
 
+class TrainingSpeedRunGPT2:
+    CATEGORY = "torch"
+    SUBCATEGORY = "training"
+    DESCRIPTION = "TrainingSpeedRunGPT2"
+
+    INPUT = {
+        "required_inputs": {
+            "gpt2": {
+                "kind": "*",
+                "name": "gpt2",
+                "widget": {"kind": "*", "name": "gpt2", "default": ""},
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "summary",
+        "cacheable": False,
+    }
+
+    def evaluate(self, node_inputs):
+        if node_inputs.get("required_inputs"):
+            if "gpt2" in node_inputs.get("required_inputs"):
+                self.input_gpt2 = node_inputs.get("required_inputs").get("gpt2").get("values")
+
+
+        import sys
+        with open(sys.argv[0]) as f:
+            code = f.read() # read the code of this file ASAP, for logging
+
+        import uuid
+        import time
+        import contextlib
+        from dataclasses import dataclass
+        from pathlib import Path
+
+        import torch
+        import torch.distributed as dist
+        import torch._inductor.config as config
+        from torch.nn.parallel import DistributedDataParallel as DDP
+
+        # -----------------------------------------------------------------------------
+        # Muon optimizer
+
+        @torch.compile
+        def zeropower_via_newtonschulz5(G, steps=10, eps=1e-7):
+            """
+            Newton-Schulz iteration to compute the zeroth power / orthogonalization of G. We opt to use a
+            quintic iteration whose coefficients are selected to maximize the slope at zero. For the purpose
+            of minimizing steps, it turns out to be empirically effective to keep increasing the slope at
+            zero even beyond the point where the iteration no longer converges all the way to one everywhere
+            on the interval. This iteration therefore does not produce UV^T but rather something like US'V^T
+            where S' is diagonal with S_{ii}' ~ Uniform(0.5, 1.5), which turns out not to hurt model
+            performance at all relative to UV^T, where USV^T = G is the SVD.
+            """
+            assert len(G.shape) == 2
+            a, b, c = (3.4445, -4.7750,  2.0315)
+            X = G.bfloat16()
+            X /= (X.norm() + eps) # ensure top singular value <= 1
+            if G.size(0) > G.size(1):
+                X = X.T
+            for _ in range(steps):
+                A = X @ X.T
+                B = b * A + c * A @ A # adapted from suggestion by @jxbz, @leloykun, and @YouJiacheng
+                X = a * X + B @ X
+            if G.size(0) > G.size(1):
+                X = X.T
+            return X
+
+        class Muon(torch.optim.Optimizer):
+            """
+            Muon - MomentUm Orthogonalized by Newton-schulz
+
+            Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-
+            processing step, in which each 2D parameter's update is replaced with the nearest orthogonal
+            matrix. To efficiently orthogonalize each update, we use a Newton-Schulz iteration, which has
+            the advantage that it can be stably run in bfloat16 on the GPU.
+
+            Some warnings:
+            - This optimizer assumes that all parameters passed in are 2D.
+            - It should not be used for the embedding layer, the final fully connected layer, or any {0,1}-D
+            parameters; those should all be optimized by a standard method (e.g., AdamW).
+            - To use it with 4D convolutional filters, it works well to just flatten their last 3 dimensions.
+            - We believe it is unlikely to work well for training with small batch size.
+            - We believe it may not work well for finetuning pretrained models, but we haven't tested this.
+            - We have not yet tried this optimizer for training scenarios larger than NanoGPT (124M).
+
+            Arguments:
+                lr: The learning rate used by the internal SGD.
+                momentum: The momentum used by the internal SGD.
+                nesterov: Whether to use Nesterov-style momentum in the internal SGD. (recommended)
+                ns_steps: The number of Newton-Schulz iteration steps to use.
+            """
+            def __init__(self, params, lr=0.02, momentum=0.95, nesterov=True, ns_steps=5):
+                self.world_size = int(os.environ['WORLD_SIZE'])
+                self.rank = int(os.environ['RANK'])
+                defaults = dict(lr=lr, momentum=momentum, nesterov=nesterov, ns_steps=ns_steps)
+                params = list(params)
+                assert all(isinstance(p, torch.Tensor) for p in params)
+                sizes = {p.numel() for p in params}
+                param_groups = [
+                    {
+                        'params': [p for p in params if p.numel() == size],
+                        'update_buffer': [
+                            torch.empty(size, device='cuda', dtype=torch.bfloat16)
+                            for _ in range(self.world_size)
+                        ],
+                    }
+                    for size in sizes
+                ]
+                super().__init__(param_groups, defaults)
+
+            def step(self):
+
+                for group in self.param_groups:
+
+                    lr = group['lr']
+                    momentum = group['momentum']
+                    nesterov = group['nesterov']
+                    ns_steps = group['ns_steps']
+                    update_buffers = group['update_buffer']
+                    # generate weight updates in distributed fashion
+                    params = group['params']
+                    assert len(params) % self.world_size == 0
+                    handle = None
+                    params_world = None
+                    def update_prev():
+                        if params_world is None:
+                            return
+                        assert handle is not None
+                        handle.wait()
+                        for p_world, g_world in zip(params_world, update_buffers):
+                            p_world.data.add_(
+                                g_world.view_as(p_world),
+                                alpha=-lr * max(1, p_world.size(0) / p_world.size(1)) ** 0.5,
+                            )
+                    for base_i in range(len(params))[::self.world_size]:
+                        p = params[base_i + self.rank]
+                        g = p.grad
+                        assert g is not None
+                        state = self.state[p]
+                        if 'momentum_buffer' not in state:
+                            state['momentum_buffer'] = torch.zeros_like(g)
+                        buf = state['momentum_buffer']
+                        buf.lerp_(g, 1 - momentum)
+                        g = g.lerp_(buf, momentum) if nesterov else buf
+                        g = zeropower_via_newtonschulz5(g, steps=ns_steps).flatten()
+                        update_prev()
+                        handle = dist.all_gather(update_buffers, g, async_op=True)
+                        params_world = params[base_i : base_i + self.world_size]
+                    update_prev()
+
+        # -----------------------------------------------------------------------------
+        # Our own simple Distributed Data Loader
+
+        def _peek_data_shard(file: Path):
+            # only reads the header, returns header data
+            # header is 256 int32
+            header = torch.from_file(f"{file}", False, 256, dtype=torch.int32)
+            assert header[0] == 20240520, "magic number mismatch in the data .bin file"
+            assert header[1] == 1, "unsupported version"
+            return int(header[2]) # number of tokens (claimed)
+
+        def _load_data_shard(path: Path, num_tokens):
+            with path.open("rb", buffering=0) as f:
+                tokens = torch.empty(num_tokens, dtype=torch.uint16, pin_memory=True)
+                f.seek(256 * 4)
+                nbytes = f.readinto(tokens.numpy())
+                assert nbytes == 2 * num_tokens, "number of tokens read does not match header?"
+            return tokens
+
+        class DistributedDataLoader:
+            def __init__(self, filename_pattern, seq_len, process_rank, num_processes):
+                self.process_rank = process_rank
+                self.num_processes = num_processes
+                self.seq_len = seq_len
+
+                # glob files that match the pattern
+                self.files = sorted(Path.cwd().glob(filename_pattern))
+                assert len(self.files) > 0, f"did not find any files that match the pattern {filename_pattern}"
+
+                # load and validate all data shards, count number of tokens in total
+                self.files_num_tokens = [_peek_data_shard(file) for file in self.files]
+                assert min(self.files_num_tokens) >= num_processes * seq_len + 1
+                self.total_num_tokens = sum(self.files_num_tokens)
+
+                self.reset()
+
+            def reset(self):
+                self.current_shard = -1
+                self.advance()
+
+            def advance(self): # advance to next data shard
+                self.current_shard = (self.current_shard + 1) % len(self.files)
+                self.current_position = self.process_rank * self.seq_len
+                self.tokens = _load_data_shard(self.files[self.current_shard], self.files_num_tokens[self.current_shard])
+
+            def next_batch(self):
+                batch_size = self.seq_len * self.num_processes
+                buf = self.tokens[self.current_position:self.current_position+self.seq_len+1]
+                # host side async is sufficient;
+                # no performance improvement was observed when introducing a separate stream.
+                inputs = buf[:-1].to(device="cuda", dtype=torch.int32, non_blocking=True) # inputs
+                targets = buf[1:].to(device="cuda", dtype=torch.int64, non_blocking=True) # targets
+                # advance current position and load next shard if necessary
+                self.current_position += batch_size
+                if self.current_position + batch_size + 1 >= len(self.tokens):
+                    self.advance()
+                return inputs, targets
+
+        # -----------------------------------------------------------------------------
+        # int main
+
+        @dataclass
+        class Hyperparameters:
+            # data hyperparams
+            input_bin : str = 'data/fineweb10B/fineweb_train_*.bin' # input .bin to train on
+            input_val_bin : str = 'data/fineweb10B/fineweb_val_*.bin' # input .bin to eval validation loss on
+            # optimization hyperparams
+            batch_size : int = 8 # batch size, in sequences, across all devices
+            sequence_length : int = 64*1024 # sequence length, in tokens
+            num_iterations : int = 1480 # number of iterations to run
+            warmup_iters : int = 0
+            cooldown_iters : int = 600 # number of iterations of linear warmup/cooldown for triangular or trapezoidal schedule
+            weight_decay : float = 0
+            # evaluation and logging hyperparams
+            val_loss_every : int = 125 # every how many steps to evaluate val loss? 0 for only at the end
+            val_tokens : int = 10485760 # how many tokens of validation data? it's important to keep this fixed for consistent comparisons
+            save_every : int = 0 # every how many steps to save the checkpoint? 0 for only at the end
+        args = Hyperparameters()
+
+        # set up DDP (distributed data parallel). torchrun sets this env variable
+        ddp_rank = int(os.environ['RANK'])
+        ddp_local_rank = int(os.environ['LOCAL_RANK'])
+        ddp_world_size = int(os.environ['WORLD_SIZE'])
+        assert torch.cuda.is_available()
+        device = torch.device(f"cuda:{ddp_local_rank}")
+        torch.cuda.set_device(device)
+        print(f"using device: {device}")
+        dist.init_process_group(backend='nccl', device_id=device)
+        dist.barrier()
+        master_process = (ddp_rank == 0) # this process will do logging, checkpointing etc.
+
+        # begin logging
+        logfile = None
+        if master_process:
+            run_id = uuid.uuid4()
+            logdir = Path("logs") / f"{run_id}"
+            logdir.mkdir(exist_ok=True)
+            logfile = Path("logs") / f"{run_id}.txt"
+            print(logfile.stem)
+            # create the log file
+            with logfile.open("w") as f:
+                # begin the log by printing this file (the Python code)
+                print(code, file=f)
+                print("=" * 100, file=f)
+        def print0(s, logonly=False):
+            if master_process:
+                with logfile.open("a") as f:
+                    if not logonly:
+                        print(s)
+                    print(s, file=f)
+        # log information about the hardware/software environment this is running on
+        # and print the full `nvidia-smi` to file
+        print0(f"Running python {sys.version}")
+        print0(f"Running pytorch {torch.version.__version__} compiled for CUDA {torch.version.cuda}\nnvidia-smi:")
+        import subprocess
+        result = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        print0(f'{result.stdout}', logonly=True)
+        print0('='*100, logonly=True)
+
+        # calculate the number of steps to take in the val loop.
+        assert args.val_tokens % (args.sequence_length * ddp_world_size) == 0
+        val_steps = args.val_tokens // (args.sequence_length * ddp_world_size)
+        # calculate the steps of gradient accumulation required to attain the desired global batch size.
+        assert args.batch_size % (ddp_world_size) == 0
+        train_accumulation_steps = args.batch_size // ddp_world_size
+
+        # load tokens
+        train_loader = DistributedDataLoader(args.input_bin, args.sequence_length, ddp_rank, ddp_world_size)
+        val_loader = DistributedDataLoader(args.input_val_bin, args.sequence_length, ddp_rank, ddp_world_size)
+        print0(f"Training DataLoader: total number of tokens: {train_loader.total_num_tokens} across {len(train_loader.files)} files")
+        print0(f"Validation DataLoader: total number of tokens: {val_loader.total_num_tokens} across {len(val_loader.files)} files")
+        print0('='*100, logonly=True)
+        inputs_train, targets_train = train_loader.next_batch()
+
+        # there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency. suggested to me by @Grad62304977.
+        # this originates from Karpathy's experiments.
+
+        # num_vocab = 50304 # (vocab_size=num_vocab, num_layers=12, num_heads=6, model_dim=768)
+
+        model = self.input_gpt2
+        model = model.cuda().bfloat16()
+        for m in model.modules():
+            if isinstance(m, CastedLinear):
+                m.float()
+        config.coordinate_descent_tuning = True # suggested by @Chillee
+        model = torch.compile(model)
+        # here we wrap model into DDP container
+        model = DDP(model, device_ids=[ddp_local_rank], broadcast_buffers=False, gradient_as_bucket_view=True)
+        raw_model = model.module # always contains the "raw" unwrapped model
+
+        # init the optimizer(s)
+        embed_params = [*raw_model.embed.parameters(), *raw_model.value_embeds.parameters()]
+        optimizer1 = torch.optim.Adam(embed_params, lr=0.6, betas=(0.8, 0.95), fused=True)
+        optimizer2 = torch.optim.Adam([raw_model.lm_head.weight], lr=0.008, betas=(0.8, 0.95), fused=True)
+        params = list(raw_model.blocks.parameters())
+        matrix_params = [p for p in params if p.ndim == 2]
+        scalar_params = [p for p in params if p.ndim < 2] + [raw_model.skip_weights]
+        optimizer3 = Muon(matrix_params, lr=0.05, momentum=0.95)
+        optimizer4 = torch.optim.Adam(scalar_params, lr=0.04, betas=(0.8, 0.95), fused=True)
+        optimizers = [optimizer1, optimizer2, optimizer3, optimizer4]
+        # learning rate decay scheduler (linear warmup and cooldown)
+        def get_lr(it):
+            assert it <= args.num_iterations
+            # 1) linear warmup for warmup_iters steps
+            if it < args.warmup_iters:
+                return (it+1) / args.warmup_iters
+            # 2) constant lr for a while
+            elif it < args.num_iterations - args.cooldown_iters:
+                return 1.0
+            # 3) linear cooldown
+            else:
+                decay_ratio = (args.num_iterations - it) / args.cooldown_iters
+                return decay_ratio
+        schedulers = [torch.optim.lr_scheduler.LambdaLR(opt, get_lr) for opt in optimizers]
+
+        sliding_window_num_blocks = torch.tensor(1, dtype=torch.int32, device="cuda")
+        sw_num_blocks_prev = 1
+        # Start training loop
+        training_time_ms = 0
+        # start the clock
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        # begin training
+        for step in range(args.num_iterations + 1):
+            last_step = (step == args.num_iterations)
+            # This effectively ignores timing first 10 steps, which are slower for weird reasons.
+            # Alternately, and slightly more correctly in terms of benchmarking, we could do 10
+            # steps with dummy data first, and then re-initialize the model and reset the loader.
+            if step == 10:
+                training_time_ms = 0
+                t0 = time.perf_counter()
+            timed_steps = float('nan') if step <= 11 else (step - 10) + 1 # <= 11 to avoid bug in val
+
+            # Linearly increase the sliding window size over training in chunks of 64 from 64 -> 1792. By @fernbear.bsky.social
+            frac_done = step / args.num_iterations # training progress
+            sw_num_blocks = int(((1 - frac_done) * 64 + frac_done * 1792 + 64) // 128)
+            if sw_num_blocks != sw_num_blocks_prev:
+                sliding_window_num_blocks.copy_(sw_num_blocks, non_blocking=True)
+                sw_num_blocks_prev = sw_num_blocks
+
+            # once in a while evaluate the validation dataset
+            if (last_step or (args.val_loss_every > 0 and step % args.val_loss_every == 0)):
+                # stop the clock
+                torch.cuda.synchronize()
+                training_time_ms += 1000 * (time.perf_counter() - t0)
+                # run validation batches
+                model.eval()
+                val_loader.reset()
+                val_loss = 0.0
+                for _ in range(val_steps):
+                    with torch.no_grad():
+                        inputs_val, targets_val = val_loader.next_batch()
+                        val_loss += model(inputs_val, targets_val, sliding_window_num_blocks)
+                dist.all_reduce(val_loss, op=dist.ReduceOp.AVG)
+                val_loss /= val_steps
+                # log val loss to console and to logfile
+                print0(f'step:{step}/{args.num_iterations} val_loss:{val_loss:.4f} train_time:{training_time_ms:.0f}ms step_avg:{training_time_ms/(timed_steps-1):.2f}ms')
+                # start the clock again
+                torch.cuda.synchronize()
+                t0 = time.perf_counter()
+
+            if master_process and (last_step or (args.save_every > 0 and step % args.save_every == 0)):
+                # stop the clock
+                torch.cuda.synchronize()
+                training_time_ms += 1000 * (time.perf_counter() - t0)
+                # save the state of the training process
+                log = dict(step=step, code=code, model=raw_model.state_dict(), optimizers=[opt.state_dict() for opt in optimizers])
+                torch.save(log, 'logs/%s/state_step%06d.pt' % (run_id, step))
+                # start the clock again
+                torch.cuda.synchronize()
+                t0 = time.perf_counter()
+
+            # bit confusing: we want to make sure to eval on 0th iteration
+            # but also after the very last iteration. so we loop for step <= num_iterations
+            # instead of just < num_iterations (one extra due to <=), only to do
+            # the validation/sampling one last time, and then we break right here as we're done.
+            if last_step:
+                break
+
+            # --------------- TRAINING SECTION BEGIN -----------------
+            model.train()
+            for i in range(1, train_accumulation_steps + 1):
+                with contextlib.ExitStack() as stack:
+                    if i < train_accumulation_steps: # there's no need to sync gradients every accumulation step
+                        stack.enter_context(model.no_sync())
+                    if step >= 5:
+                        stack.enter_context(torch.compiler.set_stance(skip_guard_eval_unsafe=True))
+                    model(inputs_train, targets_train, sliding_window_num_blocks).backward()
+                    inputs_train, targets_train = train_loader.next_batch()
+            if train_accumulation_steps != 1:
+                for p in model.parameters():
+                    p.grad /= train_accumulation_steps
+            # momentum warmup for Muon
+            frac = min(step/300, 1)
+            for group in optimizer3.param_groups:
+                group['momentum'] = (1 - frac) * 0.85 + frac * 0.95
+            # step the optimizers and schedulers
+            for opt, sched in zip(optimizers, schedulers):
+                opt.step()
+                sched.step()
+            # null the gradients
+            model.zero_grad(set_to_none=True)
+            # --------------- TRAINING SECTION END -------------------
+            # everything that follows now is just diagnostics, prints, logging, etc.
+            approx_time = training_time_ms + 1000 * (time.perf_counter() - t0)
+            print0(f"step:{step+1}/{args.num_iterations} train_time:{approx_time:.0f}ms step_avg:{approx_time/timed_steps:.2f}ms")
+
+        print0(f"peak memory consumption: {torch.cuda.max_memory_allocated() // 1024 // 1024} MiB")
+
 EXTENSION_MAPPINGS = {
-    "name": "llm",
+    "name": "torch_train_nano_gpt_2",
     "version": version,
-    "description": "Extension for llm inference",
-    "javascript_class_name": "llm",
+    "description": "Extension for torch training nano gpt2",
+    "javascript_class_name": "torch_train_nano_gpt_2",
     "nodes": {
         "CastedLinear": {
             "python_class": CastedLinear,
@@ -716,10 +1127,15 @@ EXTENSION_MAPPINGS = {
             "javascript_class_name": "CausalSelfAttention",
             "display_name": "CausalSelfAttention",
         },
-        "MLP": {
-            "python_class": MLP,
-            "javascript_class_name": "MLP",
-            "display_name": "MLP",
+        "MultiLayerPerceptron": {
+            "python_class": MultiLayerPerceptron,
+            "javascript_class_name": "MultiLayerPerceptron",
+            "display_name": "MultiLayerPerceptron",
+        },
+        "TransformerBlock": {
+            "python_class": TransformerBlock,
+            "javascript_class_name": "TransformerBlock",
+            "display_name": "TransformerBlock",
         },
         "ValueEmbedding": {
             "python_class": ValueEmbedding,
@@ -730,6 +1146,11 @@ EXTENSION_MAPPINGS = {
             "python_class": GPT2,
             "javascript_class_name": "GPT2",
             "display_name": "GPT2",
+        },
+        "TrainingSpeedRunGPT2": {
+            "python_class": TrainingSpeedRunGPT2,
+            "javascript_class_name": "TrainingSpeedRunGPT2",
+            "display_name": "TrainingSpeedRunGPT2",
         }
     },
     "rules": {},
