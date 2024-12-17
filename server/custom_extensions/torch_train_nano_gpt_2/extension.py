@@ -916,17 +916,51 @@ class TrainingSpeedRunGPT2:
             save_every : int = 0 # every how many steps to save the checkpoint? 0 for only at the end
         args = Hyperparameters()
 
-        # set up DDP (distributed data parallel). torchrun sets this env variable
-        ddp_rank = int(os.environ['RANK'])
-        ddp_local_rank = int(os.environ['LOCAL_RANK'])
-        ddp_world_size = int(os.environ['WORLD_SIZE'])
         assert torch.cuda.is_available()
-        device = torch.device(f"cuda:{ddp_local_rank}")
+
+        # Initialize DDP settings without relying on torchrun
+        def init_distributed():
+            if torch.cuda.is_available():
+                # Get total number of GPUs available
+                num_gpus = torch.cuda.device_count()
+
+                # Set default values for single-GPU case
+                rank = 0
+                local_rank = 0
+                world_size = 1
+
+                if num_gpus > 1:
+                    # Multi-GPU setup
+                    os.environ['MASTER_ADDR'] = 'localhost'
+                    os.environ['MASTER_PORT'] = '12355'
+
+                    # Initialize process group
+                    torch.distributed.init_process_group(
+                        backend='nccl',
+                        init_method='env://',
+                        world_size=num_gpus,
+                        rank=rank
+                    )
+                    local_rank = rank % num_gpus
+                    world_size = num_gpus
+
+                return rank, local_rank, world_size, torch.device(f'cuda:{local_rank}')
+            else:
+                return 0, 0, 1, torch.device('cpu')
+
+        # Initialize distributed setup
+        ddp_rank, ddp_local_rank, ddp_world_size, device = init_distributed()
+
+        # Set device
         torch.cuda.set_device(device)
         print(f"using device: {device}")
-        dist.init_process_group(backend='nccl', device_id=device)
-        dist.barrier()
-        master_process = (ddp_rank == 0) # this process will do logging, checkpointing etc.
+
+        # Only create barrier if using multiple GPUs
+        if ddp_world_size > 1:
+            dist.barrier()
+
+        master_process = (ddp_rank == 0)
+
 
         # begin logging
         logfile = None
