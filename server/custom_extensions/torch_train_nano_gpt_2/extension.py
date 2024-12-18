@@ -961,22 +961,24 @@ class TrainingSpeedRunGPT2:
 
         master_process = (ddp_rank == 0)
 
-
         # begin logging
         logfile = None
         if master_process:
             run_id = uuid.uuid4()
-            logdir = Path("logs") / f"{run_id}"
+            # Create base logs directory
+            logdir = Path("logs")
             logdir.mkdir(exist_ok=True)
-            logfile = Path("logs") / f"{run_id}.txt"
-            print(logfile.stem)
-            # create the log file
-            with logfile.open("w") as f:
-                # begin the log by printing this file (the Python code)
-                print(code, file=f)
-                print("=" * 100, file=f)
+
+            # Create run-specific directory and log file
+            run_dir = logdir / str(run_id)
+            run_dir.mkdir(exist_ok=True)
+
+            # Create log file in the run directory
+            logfile = run_dir / "training.log"
+            print(f"Logging to: {logfile}")
+
         def print0(s, logonly=False):
-            if master_process:
+            if master_process and logfile is not None:
                 with logfile.open("a") as f:
                     if not logonly:
                         print(s)

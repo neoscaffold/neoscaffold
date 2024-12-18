@@ -2,3 +2,5 @@ numpy==1.23.5
 tqdm
 torch
 huggingface-hub
+datasets
+tiktoken
