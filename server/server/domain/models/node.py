@@ -2,6 +2,8 @@ from dataclasses import asdict, dataclass, field
 import json
 from typing import Any, List, Optional
 
+from ..utilities.fallback_json_encoder import FallbackJSONEncoder
+
 from ..quality.models.evaluation import Evaluation
 from ..quality.models.rule import Rule
 
@@ -205,7 +207,7 @@ class Node(DataClassJSONMixin):
             yield key, value
 
     def __repr__(self):
-        return json.dumps(dict(self))
+        return json.dumps(dict(self), cls=FallbackJSONEncoder)
 
     def __str__(self):
         return self.__repr__()

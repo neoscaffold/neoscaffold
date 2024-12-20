@@ -14,6 +14,7 @@ from io import BytesIO
 
 from PIL import Image, ImageOps
 from ...domain.services.graph_executor import GraphExecutor
+from ...domain.utilities.fallback_json_encoder import dumps
 from ..apis.base_routes import base_routes
 from ..apis.websocket_routes import base_websocket
 
@@ -159,9 +160,9 @@ class Server:
         if sid is None:
             sockets = list(self.sockets.values())
             for ws in sockets:
-                await self.try_send_socket(ws.send_json, message)
+                await self.try_send_socket(ws.send_json, message, dumps=dumps)
         elif sid in self.sockets:
-            await self.try_send_socket(self.sockets[sid].send_json, message)
+            await self.try_send_socket(self.sockets[sid].send_json, message, dumps=dumps)
 
     def send_sync(self, event, data, sid=None):
         self.loop.call_soon_threadsafe(
@@ -460,9 +461,12 @@ class Server:
 
         return json_data
 
-    async def try_send_socket(self, function, message):
+    async def try_send_socket(self, function, message, dumps):
         try:
-            await function(message)
+            if dumps:
+                await function(message, dumps=dumps)
+            else:
+                await function(message)
         except (
             aiohttp.ClientError,
             aiohttp.ClientPayloadError,
