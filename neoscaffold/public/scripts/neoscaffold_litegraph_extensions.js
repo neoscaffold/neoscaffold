@@ -494,6 +494,7 @@
       scope.addExtraMenuOptions(canvas);
       scope.addSideMenuOptions(canvas);
       scope.addRuntimeButtons(canvas);
+      scope.addKeyboardShortcuts(canvas);
 
       scope.litegraphCanvas = canvas;
       canvas.canvas.width = window.innerWidth;
@@ -1597,6 +1598,151 @@
       canvas.setDirty(true);
       canvas.graph.afterChange();
       await NeoScaffold.api.postToggleRestart(workflowSnapshot.checksum, nodeIds, allRestart);
+    },
+
+    /**
+     * Adds keyboard shortcuts to the canvas
+     * @param {LiteGraphCanvas} canvas
+     */
+    addKeyboardShortcuts(litegraphCanvas) {
+      litegraphCanvas.canvas.removeEventListener('keydown', litegraphCanvas._key_callback, true);
+      document.removeEventListener('keyup', litegraphCanvas._key_callback, true);
+
+      async function processKey(e) {
+        if (!this.graph) {
+          return;
+        }
+
+        var block_default = false;
+        // console.log(e); //debug
+
+        if (e.target.localName == 'input') {
+          return;
+        }
+
+        if (e.type == 'keydown') {
+          if (e.keyCode == 32) {
+            //space
+            // this.dragging_canvas = true;
+            if (NeoScaffold['isPaused']) {
+              await NeoScaffold.stepThroughBreakpoints(NeoScaffold.litegraphCanvas);
+            } else {
+              await NeoScaffold.toggleBreakpoints(NeoScaffold.litegraphCanvas, true);
+            }
+            block_default = true;
+          }
+
+          if (e.keyCode == 27) {
+            //esc
+            if (this.node_panel) this.node_panel.close();
+            if (this.options_panel) this.options_panel.close();
+            block_default = true;
+          }
+
+          //select all Control A
+          if (e.keyCode == 65 && e.ctrlKey) {
+            this.selectNodes();
+            block_default = true;
+          }
+
+          if (e.keyCode === 67 && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+            //copy
+            if (this.selected_nodes) {
+              this.copyToClipboard();
+              block_default = true;
+            }
+          }
+
+          if (e.keyCode === 86 && (e.metaKey || e.ctrlKey)) {
+            //paste
+            this.pasteFromClipboard(e.shiftKey);
+          }
+
+          //delete or backspace
+          if (e.keyCode == 46 || e.keyCode == 8) {
+            if (e.target.localName != 'input' && e.target.localName != 'textarea') {
+              this.deleteSelectedNodes();
+              block_default = true;
+            }
+          }
+
+          //collapse
+          //...
+
+          //TODO
+          if (this.selected_nodes) {
+            for (var i in this.selected_nodes) {
+              if (this.selected_nodes[i].onKeyDown) {
+                this.selected_nodes[i].onKeyDown(e);
+              }
+            }
+          }
+        } else if (e.type == 'keyup') {
+          // if (e.keyCode == 32) {
+          //   // space
+          //   this.dragging_canvas = false;
+          // }
+
+          if (this.selected_nodes) {
+            for (var i in this.selected_nodes) {
+              if (this.selected_nodes[i].onKeyUp) {
+                this.selected_nodes[i].onKeyUp(e);
+              }
+            }
+          }
+        }
+
+        this.graph.change();
+
+        if (block_default) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          return false;
+        }
+      };
+
+      litegraphCanvas.processKey = processKey.bind(litegraphCanvas);
+      litegraphCanvas._key_callback = litegraphCanvas.processKey;
+
+      litegraphCanvas.canvas.addEventListener('keydown', litegraphCanvas._key_callback, true);
+      document.addEventListener('keyup', litegraphCanvas._key_callback, true); //in document, otherwise it doesn't fire keyup
+      // canvas.addEventListener('keydown', async (event) => {
+      //   // spacebar play
+      //   switch (event.key.toLowerCase()) {
+      //     case ' ':
+      //       // if paused, resume
+      //       if (NeoScaffold['isPaused']) {
+      //         await NeoScaffold.stepThroughBreakpoints(canvas);
+      //       } else {
+      //         await NeoScaffold.queuePrompt(1);
+      //       }
+      //       break;
+
+      //     case 'b':
+      //       NeoScaffold.toggleBreakpoints(canvas, true);
+      //       break;
+
+      //     case 'r':
+      //       if (event.ctrlKey) {
+      //         NeoScaffold.toggleRestartPoints(canvas, true);
+      //       }
+      //       break;
+
+      //     case 's':
+      //       if (event.ctrlKey) {
+      //         await NeoScaffold.exportWorkflow();
+      //         event.preventDefault(); // Prevent browser save dialog
+      //       }
+      //       break;
+
+      //     case 'i':
+      //       if (event.ctrlKey) {
+      //         document.getElementById('workflow-input').click();
+      //         event.preventDefault();
+      //       }
+      //       break;
+      //   }
+      // });
     },
 
     /**
