@@ -1615,6 +1615,7 @@
 
         var block_default = false;
         // console.log(e); //debug
+        // remove the debug
 
         if (e.target.localName == 'input') {
           return;
