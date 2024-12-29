@@ -6,3 +6,4 @@
 - the js widget should be expandable and have a "full screen" mode that allows the user to interact with the chat interface in a more immersive way
 - a goal for this would be to replicate the chat interface that has been successful elsewhere
 - consider using the standard openai chat completions interface in addition to features like streaming and agentic tool use
+- reference the user interface and ideas in metagptx by deepwisdom.ai
