@@ -54,7 +54,7 @@ class CerebrasAgent:
 
         config_list = [
             {
-                "model": "llama3.1-70b",
+                "model": "llama3.3-70b",
                 "api_key": self.api_key,
                 "api_type": "cerebras",
                 "max_tokens": 8192,
