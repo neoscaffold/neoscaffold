@@ -1,3 +1,7 @@
+#litegraph {
+  height: calc(100dvh - 100px);
+  width: calc(100dvw);
+}
 .litegraph, .graphdialog, .lgraphcanvas {
   font-family: $attention, sans-serif !important;
 }

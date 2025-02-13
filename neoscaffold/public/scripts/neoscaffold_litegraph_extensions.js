@@ -497,8 +497,8 @@
       scope.addKeyboardShortcuts(canvas);
 
       scope.litegraphCanvas = canvas;
-      canvas.canvas.width = window.clientWidth;
-      canvas.canvas.height = window.clientHeight - 50;
+      canvas.canvas.width = canvas.canvas.clientWidth;
+      canvas.canvas.height = canvas.canvas.clientHeight;
 
       // Bind the resize event to update the canvas width
       scope._resizeHandler = scope.updateCanvasSize.bind(scope, canvas);
@@ -1154,8 +1154,8 @@
     },
 
     updateCanvasSize(canvas) {
-      canvas.canvas.width = window.clientWidth;
-      canvas.canvas.height = window.clientHeight - 50;
+      canvas.canvas.width = canvas.canvas.clientWidth;
+      canvas.canvas.height = canvas.canvas.clientHeight;
     },
 
     // TODO: make this cool again
