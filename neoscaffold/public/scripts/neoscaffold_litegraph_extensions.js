@@ -889,7 +889,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 1000;
+        z-index: 10009;
       `;
 
       // Create modal content
@@ -1156,6 +1156,9 @@
     updateCanvasSize(canvas) {
       canvas.canvas.width = canvas.canvas.clientWidth;
       canvas.canvas.height = canvas.canvas.clientHeight;
+
+      this.updateToolbarPosition(canvas);
+      this.updateSideMenuPosition(canvas);
     },
 
     // TODO: make this cool again
@@ -1757,14 +1760,12 @@
     addRuntimeButtons(canvas) {
       // create a toolbar container
       const toolbar = document.createElement('div');
-      toolbar.style.position = 'fixed';
-      toolbar.style.bottom = '50px';
-      toolbar.style.left = '50%';
-      toolbar.style.transform = 'translateX(-50%)';
+      toolbar.style.position = 'absolute';
       toolbar.style.zIndex = '1000';
       toolbar.style.display = 'flex';
       toolbar.style.justifyContent = 'center';
       toolbar.style.alignItems = 'center';
+      toolbar.classList.add('neoscaffold-runtime-toolbar');
 
       // add buttons to the toolbar
       const buttons = [
@@ -1807,9 +1808,32 @@
         toolbar.appendChild(buttonElement);
       });
 
-      document.body.appendChild(toolbar);
+      // Add the toolbar to the canvas container
+      canvas.canvas.parentElement.appendChild(toolbar);
+
+      // Update position initially and on canvas resize
+      this.updateToolbarPosition(canvas);
 
       return toolbar;
+    },
+
+    /**
+     * Updates the position of the toolbar and side menu
+     * @param {LiteGraphCanvas} canvas
+     */
+    updateToolbarPosition(canvas) {
+      // find all toolbar elements by class name
+      const toolbars = document.getElementsByClassName('neoscaffold-runtime-toolbar');
+
+      const canvasContainer = canvas.canvas.parentElement;
+
+      for (const toolbar of toolbars) {
+        const toolbarRect = toolbar.getBoundingClientRect();
+        const centerX = canvasContainer.clientWidth / 2 - toolbarRect.width / 2;
+        const centerY = canvasContainer.clientHeight - toolbarRect.height;
+        toolbar.style.left = `${centerX}px`;
+        toolbar.style.top = `${centerY}px`;
+      }
     },
 
     addExtraMenuOptions(canvas) {
@@ -1839,15 +1863,13 @@
     addSideMenuOptions(canvas) {
       // Create floating side menu container
       let sideMenu = document.createElement('div');
-      sideMenu.style.position = 'fixed';
-      sideMenu.style.right = '20px';
-      sideMenu.style.top = '50%';
-      sideMenu.style.transform = 'translateY(-50%)';
+      sideMenu.style.position = 'absolute';
       sideMenu.style.backgroundColor = '#2c2c2c';
       sideMenu.style.padding = '10px';
       sideMenu.style.borderRadius = '5px';
       sideMenu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
       sideMenu.style.zIndex = '1000';
+      sideMenu.classList.add('neoscaffold-side-menu');
 
       // Add buttons to side menu
       const menuItems = [
@@ -1910,7 +1932,34 @@
         sideMenu.appendChild(button);
       });
 
-      document.body.appendChild(sideMenu);
+      canvas.canvas.parentElement.appendChild(sideMenu);
+
+      // Update position initially and on canvas resize
+      this.updateSideMenuPosition(canvas);
+    },
+
+    /**
+     * Updates the position of the side menu
+     * @param {LiteGraphCanvas} canvas
+     */
+    updateSideMenuPosition(canvas) {
+      // find all side menu elements by class name
+      const sideMenus = document.getElementsByClassName('neoscaffold-side-menu');
+
+      // get current canvas width
+      const canvasContainer = canvas.canvas.parentElement;
+      const canvasContainerWidth = canvasContainer.clientWidth;
+
+      for (const sideMenu of sideMenus) {
+        // side menu should be 1/5 of the canvas width or 150px, whichever is greater
+        sideMenu.style.width = `${Math.max(canvasContainerWidth / 5, 150)}px`;
+
+        const sideMenuRect = sideMenu.getBoundingClientRect();
+        const sideMenuX = canvasContainerWidth - sideMenuRect.width - 30;
+        const sideMenuY = (canvasContainer.clientHeight / 2) - sideMenuRect.height / 2;
+        sideMenu.style.left = `${sideMenuX}px`;
+        sideMenu.style.top = `${sideMenuY}px`;
+      }
     }
 
   });
