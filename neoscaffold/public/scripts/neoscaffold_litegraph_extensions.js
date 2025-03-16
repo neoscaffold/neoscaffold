@@ -889,7 +889,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 10009;
+        z-index: 100010;
       `;
 
       // Create modal content
