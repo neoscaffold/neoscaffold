@@ -347,8 +347,16 @@
                 LiteGraph.NODE_BOX_OUTLINE_COLOR,
                 LiteGraph.NODE_BOX_OUTLINE_COLOR
               );
+
+              // run the willExecute hook
+              if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('willExecute') && node.hooks.willExecute.length) {
+                node.hooks.willExecute.forEach((hook) => {
+                  hook.bind(scope)(node, response);
+                });
+              }
             }
           }
+
           if (data.results && Object.keys(data.results).length) {
             Object.keys(data.results).forEach((resultKey) => {
               let result = data.results[resultKey];
@@ -370,6 +378,17 @@
                   // delete previous node errors
                   if (node.properties.node_errors) {
                     delete node.properties.node_errors;
+                  }
+
+                  // if the node has original colors this and we are about to restore them this means the node has been updated
+                  if (node._originalColor && node._originalBgColor) {
+                    // run didExecute for each node
+                    if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('didExecute') && node.hooks.didExecute.length) {
+                      node.hooks.didExecute.forEach((hook) => {
+                        // scope is NeoScaffold, node, graph, prompt, queueItem
+                        hook.bind(scope)(node, response);
+                      });
+                    }
                   }
 
                   node.restoreColors();
@@ -676,6 +695,21 @@
       LiteGraph.registerNodeType(className, registeredNodes[className]);
     },
 
+    /**
+     * Creates a new node factory builder
+     *
+     * Javascript Node Life Cycle stored the the hooks property where each hook is an array of functions
+     *  nodesLoaded
+     *   didLoad
+     *  nodesQueued
+     *   willQueue
+     *   didQueue
+     *  nodeExecuted
+     *   willExecute
+     *   didExecute
+     * @param {*} nodeObject
+     * @returns
+     */
     nodeFactoryBuilder(nodeObject) {
       let scope = this;
       let title = nodeObject['display_name'] || nodeObject['name'];
@@ -1167,7 +1201,6 @@
     },
 
     async graphToPrompt(graph) {
-      // TODO: consider beforeQueued hook (to have frontend validation or other logic)
       const scope = this;
       const workflow = await scope.serializeGraph(graph, scope.checksumSHA256);
       const computedOrder = graph.computeExecutionOrder(false);
@@ -1252,9 +1285,21 @@
     async queuePrompt(batchSize) {
       batchSize = batchSize || 1;
 
+      let scope = this;
+
+      // run willQueue for each node
+      this.graph._nodes.forEach((node) => {
+        if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('willQueue') && node.hooks.willQueue.length) {
+          node.hooks.willQueue.forEach((hook) => {
+            // scope is NeoScaffold, graph
+            hook.bind(scope)(node, this.graph);
+          });
+        }
+      });
+
       let prompt = await this.graphToPrompt(this.graph);
 
-      let queuedPrompt, promptId;
+      let queuedPrompt, promptId, queueItem;
       for (let i = 0; i < batchSize; i++) {
         promptId = this.createPushId();
 
@@ -1266,12 +1311,25 @@
         }
         queuedPrompt.promptId = promptId;
 
-        this.queueItems.push({
+        queueItem = {
           id: promptId,
           status: 'queued',
           queuedPrompt,
+        };
+
+        // run didQueue for each node
+        this.graph._nodes.forEach((node) => {
+          if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('didQueue') && node.hooks.didQueue.length) {
+            node.hooks.didQueue.forEach((hook) => {
+              // scope is NeoScaffold, node, graph, prompt, queueItem
+              hook.bind(scope)(node, this.graph, prompt, queueItem);
+            });
+          }
         });
+
+        this.queueItems.push(queueItem);
       }
+
       if (this.processingQueue) {
         return;
       }
@@ -1295,7 +1353,6 @@
             break;
           }
 
-          // TODO: consider adding afterQueued hook to widgets to update seeds for nodes that use those
         }
 
       } catch (error) {
@@ -1308,6 +1365,15 @@
     },
 
     clean() {
+      let scope = this;
+      // run willDestroy for each node
+      this.graph._nodes.forEach((node) => {
+        if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('willDestroy') && node.hooks.willDestroy.length) {
+          node.hooks.willDestroy.forEach((hook) => {
+            hook.bind(scope)(node);
+          });
+        }
+      });
       this.graph.clear();
     },
 
@@ -1446,7 +1512,14 @@
         size[0] = Math.max(node.size[0], size[0]);
         size[1] = Math.max(node.size[1], size[1]);
         node.size = size;
-        // TODO: extensions loadedGraphNode hook
+
+        // run didLoad hooks
+        if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('didLoad') && node.hooks.didLoad.length) {
+          node.hooks.didLoad.forEach((hook) => {
+            // scope is NeoScaffold and the nodeObject is the nodeObject from the extension
+            hook.bind(scope)(node, node.type);
+          });
+        }
       });
 
       if (missingNodeTypes.length) {
