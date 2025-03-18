@@ -923,7 +923,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 100010;
+        z-index: 10010;
       `;
 
       // Create modal content
