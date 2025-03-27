@@ -1193,6 +1193,8 @@
 
       this.updateToolbarPosition(canvas);
       this.updateSideMenuPosition(canvas);
+
+      this.graph.change();
     },
 
     // TODO: make this cool again
