@@ -47,8 +47,8 @@ def parse_inputs(disabled=False) -> Namespace:
     parser.add_argument(
         "--max-upload-size",
         type=float,
-        default=100,
-        help="Set the maximum upload size in MB.",
+        default=10000,
+        help="Set the maximum upload size in MB. This prevents 413 Request Entity Too Large errors. Default is 100MB.",
     )
 
     parser.add_argument(

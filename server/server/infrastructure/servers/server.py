@@ -54,7 +54,9 @@ class Server:
         else:
             self.logger = logging.getLogger(__name__)
 
-        self.app = web.Application(middlewares=self.middlewares)
+        # Convert max_upload_size from MB to bytes
+        client_max_size = int(self.args.max_upload_size * 1024 * 1024)
+        self.app = web.Application(middlewares=self.middlewares, client_max_size=client_max_size)
 
         self.sockets = {}
         self.sessions = {}
