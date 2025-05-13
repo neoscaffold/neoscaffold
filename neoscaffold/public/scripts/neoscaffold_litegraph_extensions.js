@@ -23,15 +23,117 @@
     // TODO: add lap time logging to performance critical code
   }
 
+  let NeoScaffoldStorage = (global.NeoScaffoldStorage = {
+    dbName: 'neoscaffold',
+    dbVersion: 1,
+    db: null,
+    initialized: false,
+
+    async init() {
+      if (this.initialized) {
+        return;
+      }
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(this.dbName, this.dbVersion);
+
+        request.onerror = (event) => {
+          console.error('Error opening IndexedDB:', event.target.error);
+          reject(event.target.error);
+        };
+
+        request.onsuccess = (event) => {
+          this.db = event.target.result;
+          this.initialized = true;
+          resolve();
+        };
+
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+
+          // Create object stores
+          if (!db.objectStoreNames.contains('session')) {
+            db.createObjectStore('session', { keyPath: 'key' });
+          }
+          if (!db.objectStoreNames.contains('workflow')) {
+            db.createObjectStore('workflow', { keyPath: 'key' });
+          }
+          if (!db.objectStoreNames.contains('breakpoints')) {
+            db.createObjectStore('breakpoints', { keyPath: 'key' });
+          }
+        };
+      });
+    },
+
+    async getItem(storeName, key) {
+      if (!this.initialized) {
+        await this.init();
+      }
+      return new Promise((resolve, reject) => {
+        const transaction = this.db.transaction([storeName], 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.get(key);
+
+        request.onsuccess = () => {
+          resolve(request.result ? request.result.value : null);
+        };
+
+        request.onerror = (event) => {
+          console.error(`Error getting item from ${storeName}:`, event.target.error);
+          reject(event.target.error);
+        };
+      });
+    },
+
+    async setItem(storeName, key, value) {
+      if (!this.initialized) {
+        await this.init();
+      }
+      return new Promise((resolve, reject) => {
+        const transaction = this.db.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.put({ key, value });
+
+        request.onsuccess = () => {
+          resolve();
+        };
+
+        request.onerror = (event) => {
+          console.error(`Error setting item in ${storeName}:`, event.target.error);
+          reject(event.target.error);
+        };
+      });
+    },
+
+    async removeItem(storeName, key) {
+      if (!this.initialized) {
+        await this.init();
+      }
+      return new Promise((resolve, reject) => {
+        const transaction = this.db.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.delete(key);
+
+        request.onsuccess = () => {
+          resolve();
+        };
+
+        request.onerror = (event) => {
+          console.error(`Error removing item from ${storeName}:`, event.target.error);
+          reject(event.target.error);
+        };
+      });
+    }
+  });
+
   let NeoScaffoldAPI = (global.NeoScaffoldAPI = {
     baseURL: 'http://localhost:6166',
     sessionKey: 'userInfo', // default session key
 
-    getAuthorizationHeaders() {
+    async getAuthorizationHeaders() {
       if (!this.sessionKey) {
         return {};
       }
-      const session = localStorage.getItem(this.sessionKey) || '{}';
+      const session = await global.NeoScaffold.storage.getItem('session', this.sessionKey) || '{}';
       const sessionObject = JSON.parse(session);
       if (!sessionObject) {
         return {};
@@ -57,7 +159,7 @@
         console.error(error);
         return;
       }
-      const authorizationHeaders = this.getAuthorizationHeaders();
+      const authorizationHeaders = await this.getAuthorizationHeaders();
       authorizationHeaders['Content-Type'] = 'application/json';
 
       let results;
@@ -83,7 +185,7 @@
     },
 
     async getExtensions() {
-      const authorizationHeaders = this.getAuthorizationHeaders();
+      const authorizationHeaders = await this.getAuthorizationHeaders();
       authorizationHeaders['Content-Type'] = 'application/json';
 
       let results;
@@ -108,7 +210,7 @@
     },
 
     async postToggleBreakpoints(workflow_id, node_ids, allBreak) {
-      const authorizationHeaders = this.getAuthorizationHeaders();
+      const authorizationHeaders = await this.getAuthorizationHeaders();
       authorizationHeaders['Content-Type'] = 'application/json';
 
       const body = JSON.stringify({
@@ -140,7 +242,7 @@
     },
 
     async postStepThroughBreakpoints(workflow_id, node_ids) {
-      const authorizationHeaders = this.getAuthorizationHeaders();
+      const authorizationHeaders = await this.getAuthorizationHeaders();
       authorizationHeaders['Content-Type'] = 'application/json';
 
       const body = JSON.stringify({
@@ -171,7 +273,7 @@
     },
 
     async postToggleStop(workflow_id, node_ids, allStop) {
-      const authorizationHeaders = this.getAuthorizationHeaders();
+      const authorizationHeaders = await this.getAuthorizationHeaders();
       authorizationHeaders['Content-Type'] = 'application/json';
 
       const body = JSON.stringify({
@@ -203,7 +305,7 @@
     },
 
     async postToggleRestart(workflow_id, node_ids, allRestart) {
-      const authorizationHeaders = this.getAuthorizationHeaders();
+      const authorizationHeaders = await this.getAuthorizationHeaders();
       authorizationHeaders['Content-Type'] = 'application/json';
 
       const body = JSON.stringify({
@@ -234,7 +336,7 @@
       }
     },
 
-    initializeWebSocket() {
+    async initializeWebSocket() {
       const scope = this;
 
       let wsBaseUrl = scope.baseURL;
@@ -255,7 +357,7 @@
       let authenticator = '';
       let token = '';
       if (scope.sessionKey) {
-        const session = localStorage.getItem(scope.sessionKey);
+        const session = await global.NeoScaffold.storage.getItem('session', scope.sessionKey);
         const sessionObject = JSON.parse(session);
         if (!sessionObject.token || !sessionObject.authenticator) {
           return;
@@ -291,7 +393,7 @@
           let data = response.data;
 
           if (data.breakpoint) {
-            let node = NeoScaffold.graph.getNodeById(data.breakpoint);
+            let node = global.NeoScaffold.graph.getNodeById(data.breakpoint);
             if (node) {
               node.storeAndSwitchColors("#2a363b", "#2a363b");
 
@@ -302,14 +404,14 @@
 
               NeoScaffold['isPaused'] = true;
 
-              NeoScaffold.graph.setDirtyCanvas(true);
+              global.NeoScaffold.graph.setDirtyCanvas(true);
               return;
             }
           }
           NeoScaffold['isPaused'] = false;
 
           if (data.node_errors && data.node_errors.length) {
-            let node = NeoScaffold.graph.getNodeById(data.evaluation_action.node_id);
+            let node = global.NeoScaffold.graph.getNodeById(data.evaluation_action.node_id);
             if (node) {
               node.properties.node_errors = data.node_errors;
               node.storeAndSwitchColors("#FF0000", "#FF0000");
@@ -319,13 +421,13 @@
               let selectedNodes = scope.instance.litegraphCanvas.selected_nodes;
               selectedNodes[node.id] = node;
 
-              NeoScaffold.graph.setDirtyCanvas(true);
+              global.NeoScaffold.graph.setDirtyCanvas(true);
               return;
             }
           }
 
           if (data.evaluation_action) {
-            let node = NeoScaffold.graph.getNodeById(data.evaluation_action.node_id);
+            let node = global.NeoScaffold.graph.getNodeById(data.evaluation_action.node_id);
             if (node) {
               node.properties.evaluation_action = data.evaluation_action;
               if (!node.properties.result) {
@@ -362,7 +464,7 @@
               let result = data.results[resultKey];
               if (result) {
                 // update the node with the data
-                let node = NeoScaffold.graph.getNodeById(result.node_id);
+                let node = global.NeoScaffold.graph.getNodeById(result.node_id);
                 if (node) {
                   let resultObject = {
                     "prompt_id": data.prompt_id,
@@ -398,7 +500,7 @@
           }
         }
 
-        NeoScaffold.graph.setDirtyCanvas(true);
+        global.NeoScaffold.graph.setDirtyCanvas(true);
       });
 
       // Handle any errors that occur
@@ -438,6 +540,8 @@
     rules: {},
 
     api: NeoScaffoldAPI,
+
+    storage: NeoScaffoldStorage,
 
     // Modeled after base64 web-safe chars, but ordered by ASCII.
     PUSH_CHARS: '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz',
@@ -541,7 +645,7 @@
       // Load previous workflow
       let restored = false;
       try {
-        const workflowString = localStorage.getItem("workflow");
+        const workflowString = await NeoScaffold.storage.getItem('workflow', 'workflow');
         if (!workflowString) {
           throw new Error("initializing workflow");
         }
@@ -564,24 +668,23 @@
       setInterval(async () => {
         const graph = await scope.export();
         const workflow = JSON.stringify(graph);
-        localStorage.setItem("workflow", workflow);
+        await NeoScaffold.storage.setItem('workflow', 'workflow', workflow);
       }, 1000);
 
       // Initialize WebSocket
-      scope.api.initializeWebSocket();
+      await scope.api.initializeWebSocket();
 
       // periodically check if the server web socket is still open
-      setInterval(() => {
+      setInterval(async () => {
         if (scope.api && scope.api.ws && scope.api.ws.readyState !== WebSocket.OPEN) {
           console.log("Server WebSocket is not open, reconnecting...");
           try {
-            scope.api.initializeWebSocket();
+            await scope.api.initializeWebSocket();
           } catch (error) {
             console.log("Reconnecting to WebSocket");
           }
         }
       }, 1000);
-
     },
 
     loadExtensions(extensionsData) {
@@ -1613,6 +1716,7 @@
         canvas.graph.afterChange();
 
         const nodeIds = Object.keys(canvas.breakpoints[workflowSnapshot.checksum]);
+        await NeoScaffold.storage.setItem('breakpoints', workflowSnapshot.checksum, canvas.breakpoints[workflowSnapshot.checksum]);
         await NeoScaffold.api.postToggleBreakpoints(workflowSnapshot.checksum, nodeIds, allBreak);
       }
     },
