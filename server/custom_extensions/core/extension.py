@@ -310,6 +310,53 @@ class nsArrayAppend:
 
         return self.array
 
+class nsArrayAppendMemory:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Appends an element to an array"
+
+    # INPUT TYPES
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "string",
+                "name": "array",
+            },
+            "element": {
+                "kind": "*",
+                "name": "element",
+            },
+        },
+    }
+
+    # OUTPUT TYPES
+    OUTPUT = {
+        "kind": "string",
+        "name": "string",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        self.array_key = ""
+
+        if node_inputs.get("required_inputs"):
+            if "array" in node_inputs.get("required_inputs"):
+
+                self.array_key = node_inputs.get("required_inputs").get("array").get("values")
+
+                if "element" in node_inputs.get("required_inputs"):
+                    # get the element
+                    self.element = node_inputs.get("required_inputs").get("element").get("values")
+
+                    # get the array
+                    self.array = self._memory.get(self.array_key)
+
+                    if isinstance(self.array, list):
+                        # append the value to the array
+                        self.array.append(self.element)
+
+        return self.array_key
+
 
 class IfEqual:
     CATEGORY = "utilities"
@@ -22153,6 +22200,11 @@ EXTENSION_MAPPINGS = {
             "python_class": nsArrayAppend,
             "javascript_class_name": "nsArrayAppend",
             "display_name": "ArrayAppend",
+        },
+        "nsArrayAppendMemory": {
+            "python_class": nsArrayAppendMemory,
+            "javascript_class_name": "nsArrayAppendMemory",
+            "display_name": "ArrayAppendMemory",
         },
         "IfEqual": {
             "python_class": IfEqual,
