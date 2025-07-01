@@ -753,7 +753,7 @@
       }
 
       if (!checksumWorkflow) {
-        console.log("setting workflow", currentWorkflow.checksum, currentWorkflowJSON);
+        console.log("setting workflow", currentWorkflow.checksum);
         await NeoScaffold.storage.setItem('workflow', currentWorkflow.checksum, currentWorkflowJSON);
       }
 
@@ -774,8 +774,8 @@
       let activeChecksum = NeoScaffold.getLocalStorage().getItem('neoscaffold_active_workflow_checksum');
 
       if (!activeChecksum || activeChecksum !== currentWorkflow.checksum) {
-        console.log("activeChecksum", activeChecksum);
-        console.log("currentWorkflow.checksum", currentWorkflow.checksum);
+        // console.log("activeChecksum", activeChecksum);
+        // console.log("currentWorkflow.checksum", currentWorkflow.checksum);
         NeoScaffold.getLocalStorage().setItem('neoscaffold_active_workflow_checksum', currentWorkflow.checksum);
         await NeoScaffold.lazySetWorkflow(currentWorkflow);
 
@@ -787,7 +787,7 @@
     async undo() {
       if (NeoScaffold.undoStack.length > 0) {
         const previousWorkflowChecksum = NeoScaffold.undoStack.pop();
-        console.log("previousWorkflowChecksum", previousWorkflowChecksum);
+        // console.log("previousWorkflowChecksum", previousWorkflowChecksum);
         let previousWorkflow, previousWorkflowJSON;
 
         try {
@@ -797,7 +797,7 @@
           console.error("Error getting workflow from storage", error);
         }
         // console.log("previousWorkflowJSON", previousWorkflowJSON);
-        console.log("previousWorkflow", previousWorkflow);
+        // console.log("previousWorkflow", previousWorkflow);
         if (previousWorkflow) {
           let activeWorkflowChecksum = NeoScaffold.getLocalStorage().getItem('neoscaffold_active_workflow_checksum');
           NeoScaffold.redoStack.push(activeWorkflowChecksum);
@@ -812,7 +812,7 @@
     async redo() {
       if (NeoScaffold.redoStack.length > 0) {
         const nextWorkflowChecksum = NeoScaffold.redoStack.pop();
-        console.log("nextWorkflowChecksum", nextWorkflowChecksum);
+        // console.log("nextWorkflowChecksum", nextWorkflowChecksum);
         let nextWorkflow, nextWorkflowJSON;
         try {
           nextWorkflowJSON = await NeoScaffold.storage.getItem('workflow', nextWorkflowChecksum);
@@ -821,7 +821,7 @@
           console.error("Error getting workflow from storage", error);
         }
         // console.log("nextWorkflowJSON", nextWorkflowJSON);
-        console.log("nextWorkflow", nextWorkflow);
+        // console.log("nextWorkflow", nextWorkflow);
         if (nextWorkflow) {
           let activeWorkflowChecksum = NeoScaffold.getLocalStorage().getItem('neoscaffold_active_workflow_checksum');
           NeoScaffold.undoStack.push(activeWorkflowChecksum);
