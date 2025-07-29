@@ -653,7 +653,7 @@
       window.addEventListener('resize', scope._resizeHandler);
       window.addEventListener('mouseup', async () => {
         await NeoScaffold.checkWorkflowState();
-      });
+      }, true);
 
       scope.graph = graph;
       scope.graph.start();
@@ -1703,9 +1703,21 @@
       };
 
       customSerialize.nodes = serializedGraph.nodes.map((node) => {
+        // NOTE: added all the properties to track for the serialization since it matters for the checksum
         return {
           id: node.id,
           type: node.type,
+          pos : node.pos,
+          size: node.size,
+          flags: node.flags,
+          order: node.order,
+          mode: node.mode,
+          inputs: node.inputs,
+          outputs: node.outputs,
+          properties: node.properties,
+          widgets_values: node.widgets_values,
+          color: node.color,
+          bgcolor: node.bgcolor
         }
       }).sort((a, b) => a.id - b.id);
 
@@ -2014,6 +2026,7 @@
             NeoScaffold.redo();
             block_default = true;
           } else {
+            // ALWAYS check the workflow state when a key is pressed
             await NeoScaffold.checkWorkflowState();
           }
 
