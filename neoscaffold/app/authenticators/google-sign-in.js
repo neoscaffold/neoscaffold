@@ -22,7 +22,7 @@ export default class GoogleSignInAuthenticator extends BaseAuthenticator {
       }),
     });
 
-    const responseJson = await response.json();
+    const responseJson = await response.json()
 
     if (!responseJson.user_info) {
       this.notify.error('Failed to sign in with Google. Please try again.');
@@ -36,7 +36,7 @@ export default class GoogleSignInAuthenticator extends BaseAuthenticator {
       uid: userInfo.email,
       token: data.credential,
       ...userInfo,
-    };
+    }
     this.session.currentUser = fullUserInfo;
 
     // save user info to local storage
@@ -61,10 +61,7 @@ export default class GoogleSignInAuthenticator extends BaseAuthenticator {
     userInfo = JSON.parse(userInfo);
 
     // check if user is expired
-    if (
-      userInfo.expiration &&
-      userInfo.expiration < new Date().getTime() / 1000
-    ) {
+    if (userInfo.expiration && (userInfo.expiration < (new Date().getTime() / 1000))) {
       this.notify.error('Your session has expired. Please sign in again.');
       this.session.invalidate();
       localStorage.removeItem('userInfo');

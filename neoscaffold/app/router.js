@@ -14,5 +14,8 @@ Router.map(function () {
 
   this.route('index', { path: '/' });
   this.route('workflow');
+  this.route('catalog');
   this.route('directory');
+  this.route('privacy-policy');
+  this.route('user-agreement');
 });

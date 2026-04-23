@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # SET the REGISTRY here, where the docker container should be pushed
-REGISTRY=${REGISTRY:-"us-docker.pkg.dev/neoscaffold/images"}
+REGISTRY="us-docker.pkg.dev/neoscaffold/images"
 
 # SET the appname here
 PROJECT_NAME="neoscaffold"

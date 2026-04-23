@@ -3,17 +3,17 @@
     {{#if this.canBackPage}}
       {{!-- template-lint-disable require-presentational-children --}}
       <div class="bk" role="button" {{on "click" this.goBack}}>
-        <FaIcon @icon="angle-left" class="fa"/>
+        <i class="fa-solid fa-angle-left fa" aria-hidden="true"></i>
       </div>
     {{else}}
       {{#if @linkUrl}}
         {{#if @linkParam}}
           <LinkTo @route={{@linkUrl}} @model={{@linkParam}} class="bk" role="button">
-            <FaIcon @icon="angle-left" class="fa"/>
+            <i class="fa-solid fa-angle-left fa" aria-hidden="true"></i>
           </LinkTo>
         {{else}}
           <LinkTo @route={{@linkUrl}} class="bk" role="button">
-            <FaIcon @icon="angle-left" class="fa"/>
+            <i class="fa-solid fa-angle-left fa" aria-hidden="true"></i>
           </LinkTo>
         {{/if}}
       {{/if}}
@@ -22,7 +22,7 @@
     {{!-- template-lint-disable require-presentational-children --}}
     <LinkTo @route="directory" class="menul" role="button">
       <nav aria-label="menu">
-        <FaIcon @icon="bars" class="fa"/>
+        <i class="fa-solid fa-bars fa" aria-hidden="true"></i>
       </nav>
     </LinkTo>
   </div>

@@ -1,0 +1,4 @@
+// Font Awesome Pro 6 — resolved via sassOptions.includePaths (project-root kit, not relative to funnel temp)
+$fa-font-path: "../webfonts";
+@import "fontawesome";
+@import "solid";

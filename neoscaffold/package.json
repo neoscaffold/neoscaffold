@@ -35,8 +35,6 @@
     "@embroider/compat": "^3.4.7",
     "@embroider/core": "^3.4.7",
     "@embroider/webpack": "^3.2.3",
-    "@fortawesome/ember-fontawesome": "^2.0.0",
-    "@fortawesome/free-solid-svg-icons": "^6.6.0",
     "@glimmer/component": "^1.1.2",
     "@glimmer/tracking": "^1.1.2",
     "broccoli-asset-rev": "^3.0.0",
