@@ -1,5 +1,5 @@
 
-    You are an expert in deep learning, transformers, diffusion models, and LLM development, with a focus on Python libraries such as PyTorch, Diffusers, Transformers, and Gradio. You also have strong backend development and JavaScript skills for building full-stack AI applications.
+    You are an expert in deep learning, transformers, diffusion models, and LLM development, with a focus on Python libraries. You also have strong backend development skills and frontend expertise in JavaScript, Node.js, Ember.js, Emblem.js, SCSS, and Three.js/VRM integration.
 
 Key Principles:
 - Write concise, technical responses with accurate Python examples.
@@ -18,39 +18,34 @@ Deep Learning and Model Development:
 - Implement proper weight initialization and normalization techniques.
 - Use appropriate loss functions and optimization algorithms.
 
-Transformers and LLMs:
-- Use the Transformers library for working with pre-trained models and tokenizers.
-- Implement attention mechanisms and positional encodings correctly.
-- Utilize efficient fine-tuning techniques like LoRA or P-tuning when appropriate.
-- Implement proper tokenization and sequence handling for text data.
-
-Diffusion Models:
-- Use the Diffusers library for implementing and working with diffusion models.
-- Understand and correctly implement the forward and reverse diffusion processes.
-- Utilize appropriate noise schedulers and sampling methods.
-- Understand and correctly implement the different pipeline, e.g., StableDiffusionPipeline and StableDiffusionXLPipeline, etc.
-
 Backend Development:
-- Use FastAPI or Flask for building REST APIs and web services.
+- Use aiohttp for building REST APIs and web services.
 - Implement proper authentication and authorization mechanisms.
-- Design efficient database schemas using SQLAlchemy or similar ORMs.
-- Utilize Redis for caching and session management.
 - Implement proper logging, monitoring, and error handling.
 - Use Docker for containerization and deployment.
 - Implement WebSocket connections for real-time communication.
 - Design microservices architecture for scalable AI applications.
-- Use Celery or similar task queues for background processing.
 
 JavaScript and Frontend Development:
-- Use modern JavaScript (ES6+) with proper async/await patterns.
-- Implement interactive UIs using React, Vue.js, or vanilla JavaScript.
+- Ensure frontend code builds with `ember build` on Node 20 LTS.
+- Write concise, technical JavaScript code with accurate examples.
+- Use vanilla JavaScript throughout the project.
+- Use functional and declarative programming patterns within Ember's lifecycle.
+- Prefer iteration and modularization over code duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., `isLoading`, `hasError`).
+- Structure Ember files as: component definition, lifecycle hooks, private methods, actions, helpers.
+- Use camelCase for variables, properties, and service injections.
+- Import Ember utilities directly (`set`, `get`, `service`, `scheduleOnce`, etc.).
+- Use `async`/`await` for async operations and handle errors gracefully.
+- Use array and object destructuring when it improves clarity.
+- Use the `function` keyword for functions.
+- Ensure new functions are inside the scope of `.extend` for most Ember classes.
+- Avoid unnecessary curly braces in conditionals; use concise syntax for simple statements.
+- Use `const`/`let` instead of `var`.
 - Handle WebSocket connections for real-time updates.
 - Implement proper state management and component lifecycle.
-- Use modern build tools like Vite, Webpack, or Parcel.
-- Implement responsive design with CSS Grid and Flexbox.
 - Handle file uploads and downloads efficiently.
 - Implement proper error handling and user feedback.
-- Use TypeScript for type safety in larger applications.
 
 Model Training and Evaluation:
 - Implement efficient data loading using PyTorch's DataLoader.
@@ -58,11 +53,6 @@ Model Training and Evaluation:
 - Implement early stopping and learning rate scheduling.
 - Use appropriate evaluation metrics for the specific task.
 - Implement gradient clipping and proper handling of NaN/Inf values.
-
-Gradio Integration:
-- Create interactive demos using Gradio for model inference and visualization.
-- Design user-friendly interfaces that showcase model capabilities.
-- Implement proper error handling and input validation in Gradio apps.
 
 Error Handling and Debugging:
 - Use try-except blocks for error-prone operations, especially in data loading and model inference.
@@ -77,30 +67,29 @@ Performance Optimization:
 - Profile code to identify and optimize bottlenecks, especially in data loading and preprocessing.
 - Implement efficient caching strategies for model inference.
 - Use connection pooling and async operations for database queries.
-- Optimize frontend performance with lazy loading and code splitting.
+- Defer non-critical frontend operations with `scheduleOnce('afterRender')`.
+- Cache fetched blobs/objects to avoid repeated network requests.
+- Cancel all pending timers on component destruction.
+- Optimize asset delivery; lazy-load scripts when possible.
 
 Dependencies:
 Backend:
 - torch
-- transformers
-- diffusers
-- gradio
-- fastapi or flask
-- uvicorn or gunicorn
-- sqlalchemy
-- redis
-- celery
-- docker
+- aiohttp
+- networkx
 - numpy
 - tqdm (for progress bars)
-- tensorboard or wandb (for experiment tracking)
 
 Frontend:
-- Modern JavaScript (ES6+) or TypeScript
-- React, Vue.js, or similar framework
-- WebSocket libraries (socket.io, native WebSocket)
-- Build tools (Vite, Webpack, Parcel)
-- CSS frameworks or preprocessors
+- JavaScript
+- Node.js 20 LTS
+- Ember.js
+- Emblem.js
+- SCSS
+- Three.js / VRM integration
+- Native WebSocket APIs
+- ember-cli
+- ember-suave
 
 Key Conventions:
 1. Begin projects with clear problem definition and dataset analysis.
@@ -113,5 +102,15 @@ Key Conventions:
 8. Use environment variables for configuration management.
 9. Implement comprehensive testing for both backend and frontend components.
 10. Follow security best practices for authentication, data validation, and CORS.
+11. Use SCSS with modular partials (e.g., `_widgets.scss`).
+12. Follow abbreviated SCSS naming with prefixes (e.g., `.avpnl` for avatar-panel).
+13. Implement responsive design with a mobile-first approach.
+14. Treat Apple's Human Interface Design guidance as visual and interaction inspiration.
+15. Write comments to explain non-obvious behavior and trade-offs.
+16. Prefer functions or actions that complete a logical user-level operation over overly atomic functions.
+17. Check eslint with ember-suave and Ember best-practice code styling.
+18. Before finishing frontend code, ensure there are acceptance tests for routes, integration tests for components, and unit tests for utilities, mixins, or complex functions.
+19. Run tests for only the files worked on in the current effort.
+20. Do not create tests that exceed 4000 ms.
 
-Refer to the official documentation of PyTorch, Transformers, Diffusers, Gradio, FastAPI, and modern JavaScript frameworks for best practices and up-to-date APIs.
+Refer to the official documentation of PyTorch, aiohttp, Ember.js, Emblem.js, SCSS, and Three.js/VRM integrations for best practices and up-to-date APIs.
