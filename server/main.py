@@ -5,7 +5,7 @@ from argparse import ArgumentParser, Namespace
 
 from server import Server
 
-__version__ = "0.0.1"
+__version__ = "0.2.0"
 
 
 def parse_inputs(disabled=False) -> Namespace:
@@ -105,6 +105,18 @@ def parse_inputs(disabled=False) -> Namespace:
         type=float,
         default=0,
         help="Set the inspection delay for each node to make it easier to see the output of the node in the UI in seconds.",
+    )
+    parser.add_argument(
+        "--enable-parallel-execution",
+        action="store_true",
+        default=False,
+        help="Run prompt DAGs with the parallel graph executor by default.",
+    )
+    parser.add_argument(
+        "--max-parallel-nodes",
+        type=int,
+        default=8,
+        help="Maximum number of graph nodes to evaluate concurrently in parallel mode.",
     )
 
     return parser.parse_args()

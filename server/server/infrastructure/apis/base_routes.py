@@ -183,8 +183,9 @@ def base_routes(server):
 
         if "prompt" in json_data:
             prompt = json_data["prompt"]
+            workflow_id = json_data.get("workflow", {}).get("checksum")
 
-            server.current_workflow_id = json_data.get("workflow", {}).get("checksum")
+            server.current_workflow_id = workflow_id
 
             # use the service
             graph = server.graph_executor.prompt_to_graph(prompt)
@@ -197,12 +198,23 @@ def base_routes(server):
                     "prompt_id": json_data["promptId"],
                     "number": 1,
                     "node_errors": [],
+                    "client_id": user_id,
+                    "workflow_id": workflow_id,
                 }
 
-                # add the following to the server's run loop but don't block the request
-                asyncio.create_task(
-                    server.graph_executor.run_sequential(graph, response)
+                execution_mode = json_data.get("executionMode")
+                run_parallel = (
+                    execution_mode == "parallel"
+                    or getattr(server, "ENABLE_PARALLEL_EXECUTION", False)
                 )
+                graph_task = (
+                    server.graph_executor.run_parallel(graph, response)
+                    if run_parallel
+                    else server.graph_executor.run_sequential(graph, response)
+                )
+
+                # add the following to the server's run loop but don't block the request
+                asyncio.create_task(graph_task)
 
                 return web.json_response(response)
             else:

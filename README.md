@@ -1,7 +1,7 @@
 <div align="center">
   <!-- Version Badge -->
   <a href='https://github.com/neoscaffold/neoscaffold/releases'>
-    <img src='https://img.shields.io/badge/version-0.0.1-black?style=for-the-badge'>
+    <img src='https://img.shields.io/badge/version-0.2.0-black?style=for-the-badge'>
   </a>
   <!-- Chat Badge -->
   <a href='https://discord.gg/fWncYRBY'>
@@ -26,6 +26,8 @@ NeoScaffold let's you visually program workflows for ai agents and more.
 You can import, edit, and export workflows for:
   - building trustworthy and safe ai use-cases
   - iterating quickly on new ideas
+
+Version 0.2.0 adds parallel graph execution for async-friendly workflows, including UI execution mode controls, async node evaluation, and control-flow support that completes `IfEqual` and `WhileLoop` graphs through their `End*` nodes while only running the selected branch/body path.
 
 ![-----------------------------------------------------](pictures/aquadivider.png)
 
@@ -100,6 +102,9 @@ python main.py;
 
 # optionally run the server with delay to watch the output of the nodes
 python main.py --inspection-delay 1;
+
+# optionally run prompts with the parallel graph executor by default
+python main.py --enable-parallel-execution --max-parallel-nodes 8;
 ```
 
 To get the front-end server running:

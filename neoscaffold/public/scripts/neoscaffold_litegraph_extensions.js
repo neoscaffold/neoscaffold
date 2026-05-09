@@ -173,6 +173,18 @@
       }
     },
 
+    async parseJsonResponse(response) {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = body.error || body.message || `Request failed with status ${response.status}`;
+        const error = new Error(message);
+        error.status = response.status;
+        error.response = body;
+        throw error;
+      }
+      return body;
+    },
+
     async queuePrompt(prompt) {
       // check if prompt is valid json
       try {
@@ -191,7 +203,7 @@
           headers: authorizationHeaders,
           body: prompt,
         });
-        return results.json();
+        return this.parseJsonResponse(results);
       } catch (error) {
         if (
           error.message &&
@@ -216,7 +228,7 @@
           method: 'GET',
           headers: authorizationHeaders,
         });
-        return results.json();
+        return this.parseJsonResponse(results);
       } catch (error) {
         if (
           error.message &&
@@ -248,7 +260,7 @@
           headers: authorizationHeaders,
           body
         });
-        return results.json();
+        return this.parseJsonResponse(results);
       } catch (error) {
         if (
           error.message &&
@@ -279,7 +291,7 @@
           headers: authorizationHeaders,
           body
         });
-        return results.json();
+        return this.parseJsonResponse(results);
       } catch (error) {
         if (
           error.message &&
@@ -311,7 +323,7 @@
           headers: authorizationHeaders,
           body
         });
-        return results.json();
+        return this.parseJsonResponse(results);
       } catch (error) {
         if (
           error.message &&
@@ -343,7 +355,7 @@
           headers: authorizationHeaders,
           body
         });
-        return results.json();
+        return this.parseJsonResponse(results);
       } catch (error) {
         if (
           error.message &&
@@ -414,10 +426,12 @@
         if (response && response.data) {
           let data = response.data;
 
+          const promptId = data.prompt_id || global.NeoScaffold.activePromptId || 'unknown';
+
           if (data.breakpoint) {
             let node = global.NeoScaffold.graph.getNodeById(data.breakpoint);
             if (node) {
-              node.storeAndSwitchColors("#2a363b", "#2a363b");
+              scope.instance.markNodePaused(promptId, node);
 
               scope.instance.litegraphCanvas.centerOnNode(node);
 
@@ -433,10 +447,11 @@
           NeoScaffold['isPaused'] = false;
 
           if (data.node_errors && data.node_errors.length) {
-            let node = global.NeoScaffold.graph.getNodeById(data.evaluation_action.node_id);
+            const errorNodeId = data.evaluation_action && data.evaluation_action.node_id;
+            let node = errorNodeId ? global.NeoScaffold.graph.getNodeById(errorNodeId) : null;
             if (node) {
-              node.properties.node_errors = data.node_errors;
-              node.storeAndSwitchColors("#FF0000", "#FF0000");
+              scope.instance.markNodeFailed(promptId, node, data.node_errors);
+              scope.instance.markRemainingNodesCancelled(promptId);
 
               scope.instance.litegraphCanvas.centerOnNode(node);
 
@@ -451,33 +466,7 @@
           if (data.evaluation_action) {
             let node = global.NeoScaffold.graph.getNodeById(data.evaluation_action.node_id);
             if (node) {
-              node.properties.evaluation_action = data.evaluation_action;
-              if (!node.properties.result) {
-                node.properties.result = {};
-              }
-              node.properties.result.timestamp = new Date().toLocaleString('en-US', {
-                hour12: true,
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                fractionalSecondDigits: 3,
-                month: '2-digit',
-                day: '2-digit',
-                year: '2-digit',
-                // timeZone: 'UTC'
-              });
-
-              node.storeAndSwitchColors(
-                LiteGraph.NODE_BOX_OUTLINE_COLOR,
-                LiteGraph.NODE_BOX_OUTLINE_COLOR
-              );
-
-              // run the willExecute hook
-              if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('willExecute') && node.hooks.willExecute.length) {
-                node.hooks.willExecute.forEach((hook) => {
-                  hook.bind(scope)(node, response);
-                });
-              }
+              scope.instance.markNodeRunning(promptId, node, data.evaluation_action, response, scope);
             }
           }
 
@@ -488,34 +477,7 @@
                 // update the node with the data
                 let node = global.NeoScaffold.graph.getNodeById(result.node_id);
                 if (node) {
-                  let resultObject = {
-                    "prompt_id": data.prompt_id,
-                    result
-                  };
-
-                  if (node.properties.result && node.properties.result.timestamp) {
-                    resultObject.timestamp = node.properties.result.timestamp;
-                  }
-
-                  node.properties.result = resultObject;
-
-                  // delete previous node errors
-                  if (node.properties.node_errors) {
-                    delete node.properties.node_errors;
-                  }
-
-                  // if the node has original colors this and we are about to restore them this means the node has been updated
-                  if (node._originalColor && node._originalBgColor) {
-                    // run didExecute for each node
-                    if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('didExecute') && node.hooks.didExecute.length) {
-                      node.hooks.didExecute.forEach((hook) => {
-                        // scope is NeoScaffold, node, graph, prompt, queueItem
-                        hook.bind(scope)(node, response);
-                      });
-                    }
-                  }
-
-                  node.restoreColors();
+                  scope.instance.markNodeCompleted(promptId, node, result, response, scope);
                 }
               }
             });
@@ -556,6 +518,19 @@
     queueItems: [],
 
     processingQueue: false,
+
+    executionMode: 'sequential',
+    executionState: {
+      mode: 'sequential',
+      activePromptIds: {},
+      nodesByPrompt: {}
+    },
+    executionColors: {
+      running: '#4f8cff',
+      failed: '#FF0000',
+      paused: '#2a363b',
+      cancelled: '#6b7280'
+    },
 
     extensions: {},
     nodes: {},
@@ -626,6 +601,227 @@
       if (id.length != 20) throw new Error('Length should be 20.');
 
       return id;
+    },
+
+    formatExecutionTimestamp() {
+      return new Date().toLocaleString('en-US', {
+        hour12: true,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        fractionalSecondDigits: 3,
+        month: '2-digit',
+        day: '2-digit',
+        year: '2-digit',
+      });
+    },
+
+    setExecutionMode(mode) {
+      if (!['sequential', 'parallel'].includes(mode)) {
+        throw new Error(`Unsupported execution mode: ${mode}`);
+      }
+      this.executionMode = mode;
+      this.executionState.mode = mode;
+      return this.executionMode;
+    },
+
+    toggleExecutionMode() {
+      const nextMode = this.executionMode === 'parallel' ? 'sequential' : 'parallel';
+      return this.setExecutionMode(nextMode);
+    },
+
+    ensureExecutionPromptState(promptId) {
+      const safePromptId = promptId || 'unknown';
+      if (!this.executionState.nodesByPrompt[safePromptId]) {
+        this.executionState.nodesByPrompt[safePromptId] = {};
+      }
+      this.executionState.activePromptIds[safePromptId] = true;
+      return this.executionState.nodesByPrompt[safePromptId];
+    },
+
+    getExecutionNodeState(promptId, nodeId) {
+      const promptState = this.ensureExecutionPromptState(promptId);
+      if (!promptState[nodeId]) {
+        promptState[nodeId] = {
+          status: 'queued',
+          startedAt: null,
+          completedAt: null,
+          willExecuteCalled: false,
+          didExecuteCalled: false
+        };
+      }
+      return promptState[nodeId];
+    },
+
+    resetExecutionState(promptId) {
+      const safePromptId = promptId || this.createPushId();
+      this.executionState.mode = this.executionMode;
+      this.executionState.activePromptIds[safePromptId] = true;
+      this.executionState.nodesByPrompt[safePromptId] = {};
+
+      if (this.graph && this.graph._nodes) {
+        this.graph._nodes.forEach((node) => {
+          if (node.mode === 2) {
+            this.markNodeSkipped(safePromptId, node);
+          } else {
+            this.markNodeQueued(safePromptId, node);
+          }
+        });
+      }
+
+      return this.executionState.nodesByPrompt[safePromptId];
+    },
+
+    markNodeQueued(promptId, node) {
+      if (!node || !node.properties) {
+        return;
+      }
+      const state = this.getExecutionNodeState(promptId, String(node.id));
+      state.status = 'queued';
+      state.startedAt = null;
+      state.completedAt = null;
+      state.willExecuteCalled = false;
+      state.didExecuteCalled = false;
+
+      node.properties.execution_status = 'queued';
+      node.properties.execution_mode = this.executionMode;
+      node.properties.execution_prompt_id = promptId;
+      delete node.properties.node_errors;
+      delete node.properties.result;
+      node.restoreColors && node.restoreColors();
+    },
+
+    markNodeSkipped(promptId, node) {
+      if (!node || !node.properties) {
+        return;
+      }
+      const state = this.getExecutionNodeState(promptId, String(node.id));
+      state.status = 'skipped';
+      state.startedAt = null;
+      state.completedAt = null;
+      state.willExecuteCalled = false;
+      state.didExecuteCalled = false;
+
+      node.properties.execution_status = 'skipped';
+      node.properties.execution_mode = this.executionMode;
+      node.properties.execution_prompt_id = promptId;
+      delete node.properties.node_errors;
+      delete node.properties.result;
+      node.restoreColors && node.restoreColors();
+    },
+
+    markNodeRunning(promptId, node, evaluationAction, response, hookScope) {
+      if (!node || !node.properties) {
+        return;
+      }
+      const state = this.getExecutionNodeState(promptId, String(node.id));
+      state.status = 'running';
+      state.startedAt = state.startedAt || this.formatExecutionTimestamp();
+
+      node.properties.execution_status = 'running';
+      node.properties.execution_mode = this.executionMode;
+      node.properties.execution_prompt_id = promptId;
+      node.properties.evaluation_action = evaluationAction;
+      if (!node.properties.result) {
+        node.properties.result = {};
+      }
+      node.properties.result.timestamp = state.startedAt;
+      node.properties.started_at = state.startedAt;
+
+      node.storeAndSwitchColors(
+        this.executionColors.running || LiteGraph.NODE_BOX_OUTLINE_COLOR,
+        LiteGraph.NODE_BOX_OUTLINE_COLOR
+      );
+
+      if (!state.willExecuteCalled && node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('willExecute') && node.hooks.willExecute.length) {
+        node.hooks.willExecute.forEach((hook) => {
+          hook.bind(hookScope || this)(node, response);
+        });
+      }
+      state.willExecuteCalled = true;
+    },
+
+    markNodeCompleted(promptId, node, result, response, hookScope) {
+      if (!node || !node.properties) {
+        return;
+      }
+      const state = this.getExecutionNodeState(promptId, String(node.id));
+      state.status = 'completed';
+      state.completedAt = state.completedAt || this.formatExecutionTimestamp();
+
+      const resultObject = {
+        prompt_id: promptId,
+        result,
+        timestamp: state.startedAt || state.completedAt,
+        started_at: state.startedAt,
+        completed_at: state.completedAt
+      };
+
+      node.properties.result = resultObject;
+      node.properties.execution_status = 'completed';
+      node.properties.execution_mode = this.executionMode;
+      node.properties.execution_prompt_id = promptId;
+      node.properties.completed_at = state.completedAt;
+
+      if (node.properties.node_errors) {
+        delete node.properties.node_errors;
+      }
+
+      if (!state.didExecuteCalled && node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('didExecute') && node.hooks.didExecute.length) {
+        node.hooks.didExecute.forEach((hook) => {
+          hook.bind(hookScope || this)(node, response);
+        });
+      }
+      state.didExecuteCalled = true;
+
+      node.restoreColors && node.restoreColors();
+    },
+
+    markNodeFailed(promptId, node, nodeErrors) {
+      if (!node || !node.properties) {
+        return;
+      }
+      const state = this.getExecutionNodeState(promptId, String(node.id));
+      state.status = 'failed';
+      state.completedAt = state.completedAt || this.formatExecutionTimestamp();
+
+      node.properties.execution_status = 'failed';
+      node.properties.execution_mode = this.executionMode;
+      node.properties.execution_prompt_id = promptId;
+      node.properties.completed_at = state.completedAt;
+      node.properties.node_errors = nodeErrors;
+      node.storeAndSwitchColors(this.executionColors.failed, this.executionColors.failed);
+    },
+
+    markNodePaused(promptId, node) {
+      if (!node || !node.properties) {
+        return;
+      }
+      const state = this.getExecutionNodeState(promptId, String(node.id));
+      state.status = 'paused';
+      node.properties.execution_status = 'paused';
+      node.properties.execution_mode = this.executionMode;
+      node.properties.execution_prompt_id = promptId;
+      node.storeAndSwitchColors(this.executionColors.paused, this.executionColors.paused);
+    },
+
+    markRemainingNodesCancelled(promptId) {
+      const promptState = this.ensureExecutionPromptState(promptId);
+      Object.keys(promptState).forEach((nodeId) => {
+        const state = promptState[nodeId];
+        if (['queued', 'running', 'paused'].includes(state.status)) {
+          const node = this.graph && this.graph.getNodeById(nodeId);
+          state.status = 'cancelled';
+          state.completedAt = state.completedAt || this.formatExecutionTimestamp();
+          if (node && node.properties) {
+            node.properties.execution_status = 'cancelled';
+            node.properties.execution_mode = this.executionMode;
+            node.properties.execution_prompt_id = promptId;
+            node.properties.completed_at = state.completedAt;
+            node.storeAndSwitchColors(this.executionColors.cancelled, this.executionColors.cancelled);
+          }
+        }
+      });
     },
 
     async createGraph(canvasSelector, baseURL, sessionKey) {
@@ -725,9 +921,6 @@
       if (!restored) {
         scope.defaultGraph();
       }
-
-      // delete all objects from workflow object store
-      scope.storage.removeAllItems('workflow');
 
       // re-add the workflow to the index
       let workflow = await scope.export();
@@ -1235,6 +1428,20 @@
         },
         prepareStatusLines(node) {
           let statusLines = [];
+          const executionStatus = node.properties && node.properties.execution_status;
+          if (executionStatus) {
+            statusLines.push(`STATUS: ${executionStatus}`);
+            statusLines.push(`MODE: ${node.properties.execution_mode || 'sequential'}`);
+            if (node.properties.started_at) {
+              statusLines.push(`STARTED: ${node.properties.started_at}`);
+            }
+            if (node.properties.completed_at) {
+              statusLines.push(`COMPLETED: ${node.properties.completed_at}`);
+            }
+            if (executionStatus === 'running') {
+              statusLines.push('Waiting for backend result...');
+            }
+          }
 
           if (node.properties && node.properties.node_errors) {
             statusLines.push('NODE_ERRORS: (click to view)');
@@ -1253,6 +1460,8 @@
             }
             let jsonResult = JSON.stringify({
               timestamp,
+              started_at: node.properties.result.started_at,
+              completed_at: node.properties.result.completed_at,
               prompt_id: node.properties.result.prompt_id,
               values: result.values,
               input_evaluation: result.input_evaluation,
@@ -1563,6 +1772,9 @@
           queuedPrompt = structuredClone(prompt);
         }
         queuedPrompt.promptId = promptId;
+        queuedPrompt.executionMode = this.executionMode || 'sequential';
+        this.activePromptId = promptId;
+        this.resetExecutionState(promptId);
 
         queueItem = {
           id: promptId,
@@ -1688,9 +1900,30 @@
     async serializeGraph(graph, hashingFunction) {
       const serializedGraph = graph.serialize();
 
-      // drop results from the serialize because it's too big
+      const runtimePropertyNames = [
+        'result',
+        'node_errors',
+        'evaluation_action',
+        'execution_status',
+        'execution_mode',
+        'execution_prompt_id',
+        'started_at',
+        'completed_at'
+      ];
+
+      // Drop runtime-only state so execution progress does not affect persistence or checksums.
       serializedGraph.nodes.forEach((node) => {
-        delete node.properties.result;
+        runtimePropertyNames.forEach((propertyName) => {
+          delete node.properties[propertyName];
+        });
+
+        const liveNode = graph.getNodeById(node.id);
+        if (liveNode && liveNode._originalColor) {
+          node.color = liveNode._originalColor;
+        }
+        if (liveNode && liveNode._originalBgColor) {
+          node.bgcolor = liveNode._originalBgColor;
+        }
       });
 
       serializedGraph.NeoScaffoldVersion = NeoScaffold.VERSION;
@@ -1919,6 +2152,11 @@
     },
 
     async toggleRestartPoints(canvas, allRestart) {
+      if (NeoScaffold.executionMode === 'parallel') {
+        alert('Restart points require sequential execution. Switch execution mode to sequential before using restart points.');
+        return;
+      }
+
       const workflowSnapshot = await NeoScaffold.export();
       if (!workflowSnapshot) {
         return;
@@ -2141,6 +2379,14 @@
           }
         },
         {
+          content: 'SEQ',
+          callback(event) {
+            const nextMode = NeoScaffold.toggleExecutionMode();
+            event.target.innerText = nextMode === 'parallel' ? 'PAR' : 'SEQ';
+            event.target.title = `Execution mode: ${nextMode}`;
+          }
+        },
+        {
           content: '⏸️',
           callback: () => NeoScaffold.toggleBreakpoints(canvas, true)
         },
@@ -2157,6 +2403,10 @@
       buttons.forEach((button) => {
         const buttonElement = document.createElement('button');
         buttonElement.innerText = button.content;
+        if (button.content === 'SEQ') {
+          buttonElement.innerText = NeoScaffold.executionMode === 'parallel' ? 'PAR' : 'SEQ';
+          buttonElement.title = `Execution mode: ${NeoScaffold.executionMode}`;
+        }
         buttonElement.style.margin = '0 5px';
         buttonElement.style.padding = '10px';
         buttonElement.style.borderRadius = '5px';

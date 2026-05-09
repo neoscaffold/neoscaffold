@@ -33,7 +33,22 @@ def resolve_value_path(path: str):
     return property_path_list
 
 
-version = "0.0.1"
+def make_evaluate_action(node_id):
+    return {
+        "node_id": node_id,
+        "runtime_action": 0,  # RuntimeAction.EVALUATE
+    }
+
+
+def make_goto_action(node_id, destination_node_id):
+    return {
+        "node_id": node_id,
+        "runtime_action": 3,  # RuntimeAction.GOTO
+        "destination_node_id": destination_node_id,
+    }
+
+
+version = "0.2.0"
 
 
 class nsString:
@@ -436,11 +451,9 @@ class IfEqual:
             node_id_of_destination = equal_true_node_ids[0]
 
             # make the IfEqualFalse a GOTO to EndIfEqual
-            next_action_topological = {
-                "node_id": equal_false_node_ids[0],
-                "runtime_action": 3,  # RuntimeAction.GOTO
-                "destination_node_id": equal_end_node_ids[0],
-            }
+            next_action_topological = make_goto_action(
+                equal_false_node_ids[0], equal_end_node_ids[0]
+            )
             evaluation_override_actions[equal_false_node_ids[0]] = (
                 next_action_topological
             )
@@ -448,29 +461,19 @@ class IfEqual:
             node_id_of_destination = equal_false_node_ids[0]
 
             # make the IfEqualTrue a GOTO to EndIfEqual
-            next_action_topological = {
-                "node_id": equal_true_node_ids[0],
-                "runtime_action": 3,  # RuntimeAction.GOTO
-                "destination_node_id": equal_end_node_ids[0],
-            }
+            next_action_topological = make_goto_action(
+                equal_true_node_ids[0], equal_end_node_ids[0]
+            )
             evaluation_override_actions[equal_true_node_ids[0]] = (
                 next_action_topological
             )
 
-        # make the next action
-        print("\n\n\n NEXT ACTION \n\n\n")
-        print(
-            f'\n\n\n {graph.nodes[self._memory["_next_action"]["node_id"]]["kind"]} \n\n\n'
-        )
-        self._memory["_next_action"] = {
-            "node_id": node_id_of_destination,
-            "runtime_action": 0,  # RuntimeAction.EVALUATE
-        }
-        # make the next action
-        print("\n\n\n NEXT ACTION \n\n\n")
-        print(
-            f'\n\n\n {graph.nodes[self._memory["_next_action"]["node_id"]]["kind"]} \n\n\n'
-        )
+        if self._memory.get("parallel"):
+            evaluation_override_actions[current_node_id] = make_goto_action(
+                current_node_id, node_id_of_destination
+            )
+        else:
+            self._memory["_next_action"] = make_evaluate_action(node_id_of_destination)
 
         return boolean_result
 
@@ -568,7 +571,18 @@ class EndIfEqual:
     }
 
     def evaluate(self, node_inputs):
-        return
+        self.IfEqual = None
+        self.node_inputs = None
+
+        if node_inputs.get("required_inputs"):
+            if "IfEqual" in node_inputs.get("required_inputs"):
+                self.IfEqual = node_inputs.get("required_inputs").get("IfEqual")
+
+        if node_inputs.get("optional_inputs"):
+            if "node_inputs" in node_inputs.get("optional_inputs"):
+                self.node_inputs = node_inputs.get("optional_inputs").get("node_inputs")
+
+        return {"node_inputs": self.node_inputs, "IfEqual": self.IfEqual}
 
 
 class WhileLoop:
@@ -658,20 +672,22 @@ class WhileLoop:
 
         if not self._memory.get(self.condition_key):
             # EvaluationAction but a dict
-            next_action_topological = {
-                "node_id": next_node_id_topological,
-                "runtime_action": 3,  # RuntimeAction.GOTO
-                "destination_node_id": node_id_of_end_while_node,
-            }
+            next_action_topological = make_goto_action(
+                current_node_id if self._memory.get("parallel") else next_node_id_topological,
+                node_id_of_end_while_node,
+            )
 
             evaluation_override_actions[current_node_id] = next_action_topological
         else:
+            if self._memory.get("parallel"):
+                evaluation_override_actions[current_node_id] = make_goto_action(
+                    current_node_id, next_node_id_topological
+                )
+
             # make the EndWhileLoop into a GOTO back to the WhileLoop
-            next_action_topological = {
-                "node_id": node_id_of_end_while_node,
-                "runtime_action": 3,  # RuntimeAction.GOTO
-                "destination_node_id": current_node_id,
-            }
+            next_action_topological = make_goto_action(
+                node_id_of_end_while_node, current_node_id
+            )
             evaluation_override_actions[node_id_of_end_while_node] = (
                 next_action_topological
             )
@@ -760,24 +776,24 @@ class BreakWhileLoop:
         if index_of_node_id < len(graph_nodes) - 1:
             next_node_id_topological = graph_nodes[index_of_node_id + 1]
             # EvaluationAction but a dict
-            next_action_topological = {
-                "node_id": next_node_id_topological,
-                "runtime_action": 3,  # RuntimeAction.GOTO
-                "destination_node_id": node_id_of_end_while_node,
-            }
+            next_action_topological = make_goto_action(
+                current_node_id if self._memory.get("parallel") else next_node_id_topological,
+                node_id_of_end_while_node,
+            )
 
             # the next node should goto the end of the while loop
-            evaluation_override_actions[next_node_id_topological] = (
-                next_action_topological
+            override_node_id = (
+                current_node_id
+                if self._memory.get("parallel")
+                else next_node_id_topological
             )
+            evaluation_override_actions[override_node_id] = next_action_topological
 
         # uncommon case the break happens at the end of the graph
         else:
-            next_action_topological = {
-                "node_id": current_node_id,
-                "runtime_action": 3,  # RuntimeAction.GOTO
-                "destination_node_id": node_id_of_end_while_node,
-            }
+            next_action_topological = make_goto_action(
+                current_node_id, node_id_of_end_while_node
+            )
             evaluation_override_actions[current_node_id] = next_action_topological
 
         return self.node_inputs
@@ -849,20 +865,22 @@ class ContinueWhileLoop:
         if index_of_node_id < len(graph_nodes) - 1:
             next_node_id_topological = graph_nodes[index_of_node_id + 1]
             # EvaluationAction but a dict
-            next_action_topological = {
-                "node_id": next_node_id_topological,
-                "runtime_action": 3,  # RuntimeAction.GOTO
-                "destination_node_id": node_id_of_while_node,
-            }
+            next_action_topological = make_goto_action(
+                current_node_id if self._memory.get("parallel") else next_node_id_topological,
+                node_id_of_while_node,
+            )
 
-            evaluation_override_actions[node_id_of_while_node] = next_action_topological
+            override_node_id = (
+                current_node_id
+                if self._memory.get("parallel")
+                else node_id_of_while_node
+            )
+            evaluation_override_actions[override_node_id] = next_action_topological
         # uncommon case the continue happens at the end of the graph
         else:
-            next_action_topological = {
-                "node_id": current_node_id,
-                "runtime_action": 3,  # RuntimeAction.GOTO
-                "destination_node_id": node_id_of_while_node,
-            }
+            next_action_topological = make_goto_action(
+                current_node_id, node_id_of_while_node
+            )
             evaluation_override_actions[current_node_id] = next_action_topological
 
         return self.node_inputs

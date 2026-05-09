@@ -48,6 +48,10 @@ class Server:
             )
         self.ENABLE_SMART_CACHE = args.enable_smart_cache or False
         self.INSPECTION_DELAY = args.inspection_delay or 0
+        self.ENABLE_PARALLEL_EXECUTION = (
+            getattr(args, "enable_parallel_execution", False) or False
+        )
+        self.MAX_PARALLEL_NODES = getattr(args, "max_parallel_nodes", 8) or 8
 
         if logger:
             self.logger = logger

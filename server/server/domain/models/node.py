@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass, field
+import inspect
 import json
 from typing import Any, List, Optional
 
@@ -56,6 +57,43 @@ class Node(DataClassJSONMixin):
 
         node_output = self.output_template()
 
+        self._prepare_evaluation(node_inputs, node_output)
+
+        if self.class_instance is None:
+            raise ValueError(f"Node {self.name} has no class instance")
+
+        # Evaluate the node
+        output = self.class_instance.evaluate(node_inputs.to_dict())
+
+        node_output.values = output
+        if inspect.isawaitable(output):
+            return node_output
+
+        self._finish_evaluation(node_inputs, node_output)
+        return node_output
+
+    async def _evaluate_async(self, node_inputs: NodeInputGroup) -> NodeOutput:
+        """Evaluate the node while allowing async class-instance evaluate methods."""
+
+        node_output = self.output_template()
+
+        self._prepare_evaluation(node_inputs, node_output)
+
+        if self.class_instance is None:
+            raise ValueError(f"Node {self.name} has no class instance")
+
+        output = self.class_instance.evaluate(node_inputs.to_dict())
+        if inspect.isawaitable(output):
+            output = await output
+
+        node_output.values = output
+
+        self._finish_evaluation(node_inputs, node_output)
+        return node_output
+
+    def _prepare_evaluation(
+        self, node_inputs: NodeInputGroup, node_output: NodeOutput
+    ) -> None:
         # fix any required node_input that is a NodeOutput
         for value in node_inputs.required_inputs.values():
             if hasattr(value, "values"):
@@ -83,14 +121,9 @@ class Node(DataClassJSONMixin):
 
         self._pre_evaluate(node_inputs)
 
-        if self.class_instance is None:
-            raise ValueError(f"Node {self.name} has no class instance")
-
-        # Evaluate the node
-        output = self.class_instance.evaluate(node_inputs.to_dict())
-
-        node_output.values = output
-
+    def _finish_evaluation(
+        self, node_inputs: NodeInputGroup, node_output: NodeOutput
+    ) -> None:
         output_evaluation = Evaluation(passed=True, outcomes={})
         try:
             output_evaluation = self._validate_output(node_inputs, node_output)
@@ -104,7 +137,6 @@ class Node(DataClassJSONMixin):
             raise e
 
         self._post_evaluate(node_inputs, node_output)
-        return node_output
 
     def input_template(self) -> NodeInputGroup:
         required_inputs = {
