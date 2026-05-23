@@ -838,6 +838,7 @@
       scope.addExtraMenuOptions(canvas);
       scope.addSideMenuOptions(canvas);
       scope.addRuntimeButtons(canvas);
+      scope.enableMultiNodeDragging(canvas);
       scope.addKeyboardShortcuts(canvas);
 
       scope.litegraphCanvas = canvas;
@@ -930,6 +931,41 @@
       // setInterval(async () => {
       //   await scope.checkWorkflowState();
       // }, 1000);
+    },
+
+    enableMultiNodeDragging(canvas) {
+      if (canvas._neoScaffoldMultiNodeDraggingEnabled) {
+        return;
+      }
+
+      const originalProcessNodeSelected = canvas.processNodeSelected;
+
+      canvas.processNodeSelected = function(node, event) {
+        const selectedCount = this.selected_nodes ? Object.keys(this.selected_nodes).length : 0;
+        const isAdditiveSelection = event && (
+          event.shiftKey ||
+          event.ctrlKey ||
+          event.altKey ||
+          this.multi_select
+        );
+
+        if (node && node.is_selected && selectedCount > 1 && !isAdditiveSelection) {
+          if (this.onNodeSelected) {
+            this.onNodeSelected(node);
+          }
+          return;
+        }
+
+        if (event && event.altKey && !event.shiftKey && !event.ctrlKey) {
+          const additiveEvent = Object.create(event);
+          additiveEvent.shiftKey = true;
+          return originalProcessNodeSelected.call(this, node, additiveEvent);
+        }
+
+        return originalProcessNodeSelected.call(this, node, event);
+      };
+
+      canvas._neoScaffoldMultiNodeDraggingEnabled = true;
     },
 
     async lazySetWorkflow(workflow) {
