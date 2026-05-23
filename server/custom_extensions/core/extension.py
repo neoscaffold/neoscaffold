@@ -6824,6 +6824,176 @@ class StringDecodeBase64:
             return {"error": str(e)}
 
 
+class ImageConvertToBase64:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "image"
+    DESCRIPTION = "Converts an image file or data URL to a Base64 image string."
+
+    INPUT = {
+        "required_inputs": {
+            "image": {
+                "kind": "*",
+                "name": "image",
+                "widget": {"kind": "string", "name": "image", "default": ""},
+            },
+        },
+        "optional_inputs": {
+            "mime_type": {
+                "kind": "*",
+                "name": "mime_type",
+                "widget": {
+                    "kind": "string",
+                    "name": "mime_type",
+                    "default": "image/png",
+                },
+            },
+            "include_data_url": {
+                "kind": "*",
+                "name": "include_data_url",
+                "widget": {
+                    "kind": "string",
+                    "name": "include_data_url",
+                    "default": "false",
+                },
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "*",
+        "cacheable": True,
+    }
+
+    def _input_value(self, node_inputs, group, name, default=None):
+        return node_inputs.get(group, {}).get(name, {}).get("values", default)
+
+    def _is_truthy(self, value):
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "y", "on")
+        return bool(value)
+
+    def evaluate(self, node_inputs):
+        try:
+            import base64
+            import os
+
+            image = self._input_value(node_inputs, "required_inputs", "image", "")
+            mime_type = self._input_value(
+                node_inputs, "optional_inputs", "mime_type", "image/png"
+            )
+            include_data_url = self._is_truthy(
+                self._input_value(
+                    node_inputs, "optional_inputs", "include_data_url", False
+                )
+            )
+
+            if isinstance(image, dict):
+                image = (
+                    image.get("path")
+                    or image.get("image_path")
+                    or image.get("data_url")
+                    or image.get("base64")
+                    or image.get("b64_json")
+                    or ""
+                )
+
+            if isinstance(image, str) and image.startswith("data:"):
+                header, base64_image = image.split(",", 1)
+                if ";" in header:
+                    mime_type = header[5:].split(";", 1)[0] or mime_type
+            elif isinstance(image, str) and os.path.exists(image):
+                with open(image, "rb") as image_file:
+                    base64_image = base64.b64encode(image_file.read()).decode()
+            elif isinstance(image, (bytes, bytearray)):
+                base64_image = base64.b64encode(image).decode()
+            elif isinstance(image, str):
+                base64_image = image
+            else:
+                raise ValueError("image must be a file path, data URL, Base64 string, or bytes")
+
+            if include_data_url:
+                return f"data:{mime_type};base64,{base64_image}"
+            return base64_image
+        except Exception as e:
+            return {"error": str(e)}
+
+
+class ImageDecodeFromBase64:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "image"
+    DESCRIPTION = "Decodes a Base64 image string or data URL to an image file."
+
+    INPUT = {
+        "required_inputs": {
+            "base64_image": {
+                "kind": "string",
+                "name": "base64_image",
+                "widget": {
+                    "kind": "string",
+                    "name": "base64_image",
+                    "default": "",
+                },
+            },
+        },
+        "optional_inputs": {
+            "output_path": {
+                "kind": "*",
+                "name": "output_path",
+                "widget": {
+                    "kind": "string",
+                    "name": "output_path",
+                    "default": "decoded_image.png",
+                },
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "string",
+        "name": "image_path",
+        "cacheable": False,
+    }
+
+    def evaluate(self, node_inputs):
+        try:
+            import base64
+            import os
+
+            base64_image = (
+                node_inputs.get("required_inputs", {})
+                .get("base64_image", {})
+                .get("values", "")
+            )
+            output_path = (
+                node_inputs.get("optional_inputs", {})
+                .get("output_path", {})
+                .get("values", "decoded_image.png")
+            )
+
+            if isinstance(base64_image, dict):
+                base64_image = (
+                    base64_image.get("base64")
+                    or base64_image.get("b64_json")
+                    or base64_image.get("data_url")
+                    or ""
+                )
+            if isinstance(base64_image, str) and base64_image.startswith("data:"):
+                base64_image = base64_image.split(",", 1)[1]
+
+            image_bytes = base64.b64decode(base64_image)
+            output_dir = os.path.dirname(output_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+
+            with open(output_path, "wb") as image_file:
+                image_file.write(image_bytes)
+
+            return {"image_path": output_path}
+        except Exception as e:
+            return {"error": str(e)}
+
+
 class StringConvertToHex:
     CATEGORY = "utilities"
     SUBCATEGORY = "string"
@@ -22928,6 +23098,16 @@ EXTENSION_MAPPINGS = {
             "python_class": StringDecodeBase64,
             "javascript_class_name": "StringDecodeBase64",
             "display_name": "StringDecodeBase64",
+        },
+        "ImageConvertToBase64": {
+            "python_class": ImageConvertToBase64,
+            "javascript_class_name": "ImageConvertToBase64",
+            "display_name": "ImageConvertToBase64",
+        },
+        "ImageDecodeFromBase64": {
+            "python_class": ImageDecodeFromBase64,
+            "javascript_class_name": "ImageDecodeFromBase64",
+            "display_name": "ImageDecodeFromBase64",
         },
         "StringConvertToHex": {
             "python_class": StringConvertToHex,
