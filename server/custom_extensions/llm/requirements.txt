@@ -1,4 +1,4 @@
-openai
+openai>=1.66.0
 cohere
 cerebras_cloud_sdk
 groq

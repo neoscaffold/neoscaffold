@@ -406,6 +406,11 @@ class OpenAI_Image:
                 "name": "n",
                 "widget": {"kind": "number", "name": "n", "default": 1},
             },
+            "timeout": {
+                "kind": "*",
+                "name": "timeout",
+                "widget": {"kind": "number", "name": "timeout", "default": 120},
+            },
         },
     }
 
@@ -423,6 +428,8 @@ class OpenAI_Image:
         prompt = required_inputs.get("prompt", {}).get("values", "")
         image_count = optional_inputs.get("n", {}).get("values", 1)
         image_count = int(image_count or 1)
+        timeout = optional_inputs.get("timeout", {}).get("values", 120)
+        timeout = float(timeout or 120)
         request = {
             "model": optional_inputs.get("model", {}).get("values", "gpt-image-2"),
             "prompt": prompt,
@@ -438,10 +445,24 @@ class OpenAI_Image:
         # Avoid sending empty optional values when widgets are cleared.
         request = {key: value for key, value in request.items() if value not in ("", None)}
 
-        from openai import OpenAI
+        from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        image_response = client.images.generate(**request)
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"), timeout=timeout)
+        try:
+            image_response = client.images.generate(**request)
+        except APITimeoutError as exc:
+            raise RuntimeError(
+                f"OpenAI image generation timed out after {timeout:g} seconds"
+            ) from exc
+        except APIStatusError as exc:
+            raise RuntimeError(
+                "OpenAI image generation failed with "
+                f"status {exc.status_code}: {exc.response.text}"
+            ) from exc
+        except APIConnectionError as exc:
+            raise RuntimeError(
+                f"OpenAI image generation connection failed: {exc}"
+            ) from exc
 
         return serialize_object(image_response)
 

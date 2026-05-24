@@ -11,8 +11,10 @@ def get_nested(data, *args):
                 if isinstance(data, list) and element.isdigit():
                     # if arg is a number, return the value at that index
                     value = data[int(element)]
-                else:
+                elif isinstance(data, dict):
                     value = data.get(element)
+                else:
+                    return None
 
                 return value if len(args) == 1 else get_nested(value, *args[1:])
     except Exception as e:
@@ -80,6 +82,37 @@ class nsString:
                 self.text = node_inputs.get("required_inputs").get("text").get("values")
 
         return self.text
+
+
+class ToString:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Converts any input value to a string."
+
+    # INPUT TYPES
+    INPUT = {
+        "required_inputs": {
+            "value": {
+                "kind": "*",
+                "name": "value",
+            },
+        }
+    }
+
+    # OUTPUT TYPES
+    OUTPUT = {
+        "kind": "string",
+        "name": "string",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        value = None
+        if node_inputs.get("required_inputs"):
+            if "value" in node_inputs.get("required_inputs"):
+                value = node_inputs.get("required_inputs").get("value").get("values")
+
+        return str(value)
 
 
 class nsBoolean:
@@ -287,6 +320,44 @@ class nsArray:
                         self.data = self.data.split(",")
 
         return self.data
+
+
+class nsArrayLength:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns the current length of an array."
+
+    # INPUT TYPES
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+        },
+    }
+
+    # OUTPUT TYPES
+    OUTPUT = {
+        "kind": "integer",
+        "name": "length",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        array = []
+        if node_inputs.get("required_inputs"):
+            if "array" in node_inputs.get("required_inputs"):
+                array = node_inputs.get("required_inputs").get("array").get("values", [])
+
+        if isinstance(array, str):
+            try:
+                array = json.loads(array)
+            except json.JSONDecodeError:
+                array = array.split(",") if array else []
+
+        return len(array)
+
 
 class nsArrayAppend:
     CATEGORY = "core"
@@ -961,11 +1032,8 @@ class ValuePath:
                     node_inputs.get("required_inputs").get("value_path").get("values")
                 )
 
-        if "." in self.value_path:
-            value_path_list = resolve_value_path(self.value_path)
-            return get_nested(self.object, *value_path_list)
-
-        return self.object.get(self.value_path)
+        value_path_list = resolve_value_path(self.value_path)
+        return get_nested(self.object, *value_path_list)
 
 
 class MemoryWrite:
@@ -1124,6 +1192,40 @@ class JSONParse:
             output_value = json.loads(self.json)
 
         return output_value
+
+
+class ExtractJSONString:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "parsing"
+    DESCRIPTION = "Extracts the first JSON object string from a larger string"
+
+    INPUT = {
+        "required_inputs": {
+            "text": {
+                "kind": "string",
+                "name": "text",
+                "widget": {"kind": "string", "name": "text", "default": ""},
+            },
+        }
+    }
+
+    OUTPUT = {
+        "kind": "string",
+        "name": "json_text",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        text = node_inputs.get("required_inputs", {}).get("text", {}).get("values", "")
+        text = str(text)
+        start = text.find("{")
+
+        if start == -1:
+            return ""
+
+        _, end = json.JSONDecoder().raw_decode(text[start:])
+        json_text = text[start : start + end]
+        return json_text
 
 
 class ConcatString:
@@ -6990,6 +7092,145 @@ class ImageDecodeFromBase64:
                 image_file.write(image_bytes)
 
             return {"image_path": output_path}
+        except Exception as e:
+            return {"error": str(e)}
+
+
+class ImageDownloadToFile:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "image"
+    DESCRIPTION = "Downloads an image URL and stores it at a destination path that includes the filename."
+
+    INPUT = {
+        "required_inputs": {
+            "image_url": {
+                "kind": "string",
+                "name": "image_url",
+                "widget": {"kind": "string", "name": "image_url", "default": ""},
+            },
+            "destination_path": {
+                "kind": "string",
+                "name": "destination_path",
+                "widget": {
+                    "kind": "string",
+                    "name": "destination_path",
+                    "default": "downloaded_image.png",
+                },
+            },
+        },
+        "optional_inputs": {
+            "timeout": {
+                "kind": "*",
+                "name": "timeout",
+                "widget": {"kind": "number", "name": "timeout", "default": 30},
+            },
+            "overwrite": {
+                "kind": "*",
+                "name": "overwrite",
+                "widget": {"kind": "string", "name": "overwrite", "default": "true"},
+            },
+            "user_agent": {
+                "kind": "*",
+                "name": "user_agent",
+                "widget": {
+                    "kind": "string",
+                    "name": "user_agent",
+                    "default": "NeoScaffold/1.0",
+                },
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "*",
+        "cacheable": False,
+    }
+
+    def _input_value(self, node_inputs, group, name, default=None):
+        return node_inputs.get(group, {}).get(name, {}).get("values", default)
+
+    def _is_truthy(self, value):
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "y", "on")
+        return bool(value)
+
+    def evaluate(self, node_inputs):
+        try:
+            import os
+            import tempfile
+            import urllib.parse
+            import urllib.request
+
+            image_url = self._input_value(
+                node_inputs, "required_inputs", "image_url", ""
+            )
+            destination_path = self._input_value(
+                node_inputs, "required_inputs", "destination_path", ""
+            )
+            timeout = float(
+                self._input_value(node_inputs, "optional_inputs", "timeout", 30) or 30
+            )
+            overwrite = self._is_truthy(
+                self._input_value(node_inputs, "optional_inputs", "overwrite", True)
+            )
+            user_agent = self._input_value(
+                node_inputs, "optional_inputs", "user_agent", "NeoScaffold/1.0"
+            )
+
+            if not image_url:
+                raise ValueError("image_url is required")
+            if not destination_path:
+                raise ValueError("destination_path is required")
+            if os.path.basename(destination_path) in ("", ".", ".."):
+                raise ValueError("destination_path must include a filename")
+
+            parsed_url = urllib.parse.urlparse(image_url)
+            if parsed_url.scheme not in ("http", "https"):
+                raise ValueError("image_url must be an http or https URL")
+
+            output_dir = os.path.dirname(destination_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+            if os.path.exists(destination_path) and not overwrite:
+                raise FileExistsError(f"{destination_path} already exists")
+
+            request = urllib.request.Request(
+                image_url,
+                headers={"User-Agent": user_agent or "NeoScaffold/1.0"},
+            )
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                content_type = response.headers.get("Content-Type", "")
+                if content_type and not content_type.lower().startswith("image/"):
+                    raise ValueError(
+                        f"URL returned {content_type!r}, expected an image content type"
+                    )
+
+                fd, temp_path = tempfile.mkstemp(
+                    prefix=".download-",
+                    suffix=".tmp",
+                    dir=output_dir or ".",
+                )
+                bytes_written = 0
+                try:
+                    with os.fdopen(fd, "wb") as image_file:
+                        while True:
+                            chunk = response.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            image_file.write(chunk)
+                            bytes_written += len(chunk)
+                    os.replace(temp_path, destination_path)
+                except Exception:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    raise
+
+            return {
+                "image_path": destination_path,
+                "bytes_written": bytes_written,
+                "content_type": content_type,
+            }
         except Exception as e:
             return {"error": str(e)}
 
@@ -22354,6 +22595,11 @@ EXTENSION_MAPPINGS = {
             "javascript_class_name": "nsString",
             "display_name": "String",
         },
+        "ToString": {
+            "python_class": ToString,
+            "javascript_class_name": "ToString",
+            "display_name": "ToString",
+        },
         "nsBoolean": {
             "python_class": nsBoolean,
             "javascript_class_name": "nsBoolean",
@@ -22383,6 +22629,11 @@ EXTENSION_MAPPINGS = {
             "python_class": nsArray,
             "javascript_class_name": "nsArray",
             "display_name": "Array",
+        },
+        "nsArrayLength": {
+            "python_class": nsArrayLength,
+            "javascript_class_name": "nsArrayLength",
+            "display_name": "ArrayLength",
         },
         "nsArrayAppend": {
             "python_class": nsArrayAppend,
@@ -22458,6 +22709,11 @@ EXTENSION_MAPPINGS = {
             "python_class": JSONParse,
             "javascript_class_name": "JSONParse",
             "display_name": "JSONParse",
+        },
+        "ExtractJSONString": {
+            "python_class": ExtractJSONString,
+            "javascript_class_name": "ExtractJSONString",
+            "display_name": "ExtractJSONString",
         },
         "ConcatString": {
             "python_class": ConcatString,
@@ -23108,6 +23364,11 @@ EXTENSION_MAPPINGS = {
             "python_class": ImageDecodeFromBase64,
             "javascript_class_name": "ImageDecodeFromBase64",
             "display_name": "ImageDecodeFromBase64",
+        },
+        "ImageDownloadToFile": {
+            "python_class": ImageDownloadToFile,
+            "javascript_class_name": "ImageDownloadToFile",
+            "display_name": "ImageDownloadToFile",
         },
         "StringConvertToHex": {
             "python_class": StringConvertToHex,
