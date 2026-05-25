@@ -234,6 +234,25 @@ class GraphExecutor:
                 running_tasks[task] = node_id
 
         while ready_queue or running_tasks:
+            scheduler_action = await apply_parallel_scheduler_interventions(
+                ready_queue=ready_queue,
+                running_tasks=running_tasks,
+                memory=memory,
+            )
+            if scheduler_action:
+                await cancel_running_tasks()
+                runtime_action = RuntimeAction(
+                    scheduler_action.get("runtime_action", RuntimeAction.EVALUATE)
+                )
+                if runtime_action == RuntimeAction.RETURN:
+                    return graph_results
+                if runtime_action == RuntimeAction.GOTO:
+                    destination_node_id = scheduler_action.get("destination_node_id")
+                    if not destination_node_id:
+                        return graph_results
+                    invalidate_parallel_goto(destination_node_id)
+                    continue
+
             start_ready_tasks()
 
             if not running_tasks:
@@ -387,7 +406,13 @@ async def sequential_runtime_step(
             # check if the event has been set
             event = breakpoints["nodes"][node_id]
             event.clear()
-            await event.wait()
+            control_action = await wait_for_breakpoint_resume_or_control(
+                event=event,
+                node_id=node_id,
+                memory=memory,
+            )
+            if control_action:
+                action = control_action
 
     restart_points = interventions.get("restart-points")
     if restart_points:
@@ -736,7 +761,13 @@ async def apply_parallel_interventions(
 
             event = breakpoints["nodes"][node_id]
             event.clear()
-            await event.wait()
+            control_action = await wait_for_breakpoint_resume_or_control(
+                event=event,
+                node_id=node_id,
+                memory=memory,
+            )
+            if control_action:
+                return control_action
 
     restart_points = interventions.get("restart-points")
     if restart_points:
@@ -771,6 +802,167 @@ async def apply_parallel_interventions(
             ).to_dict()
 
     return action
+
+
+async def apply_parallel_scheduler_interventions(
+    ready_queue: List[str],
+    running_tasks: Dict[asyncio.Task, str],
+    memory: Dict[str, Any],
+):
+    server = memory["server"]
+    client_id = memory.get("client_id", server.client_id)
+    workflow_id = memory.get("workflow_id", server.current_workflow_id)
+    interventions = get_workflow_interventions(
+        server=server,
+        client_id=client_id,
+        workflow_id=workflow_id,
+    )
+
+    node_id = (
+        ready_queue[0]
+        if ready_queue
+        else next(iter(running_tasks.values()), None)
+    )
+    stop_action = await apply_stop_intervention(node_id=node_id, memory=memory)
+    if stop_action:
+        return stop_action
+
+    restart_action = await apply_restart_intervention(node_id=node_id, memory=memory)
+    if restart_action:
+        return restart_action
+
+    breakpoints = interventions.get("breakpoints")
+    if breakpoints and breakpoints.get("all_break", False) and ready_queue:
+        node_id = ready_queue[0]
+        await server.send_json(
+            event="message",
+            data={"breakpoint": node_id},
+            sid=client_id,
+        )
+
+        breakpoints["all_break"] = False
+        if node_id not in breakpoints.get("nodes", {}):
+            breakpoints.setdefault("nodes", {})[node_id] = asyncio.Event()
+
+        event = breakpoints["nodes"][node_id]
+        event.clear()
+        control_action = await wait_for_breakpoint_resume_or_control(
+            event=event,
+            node_id=node_id,
+            memory=memory,
+        )
+        if control_action:
+            return control_action
+
+    return None
+
+
+def get_workflow_interventions(server, client_id, workflow_id):
+    return (
+        server.sessions.get(client_id, {})
+        .get(workflow_id, {})
+        .get("interventions", {})
+    )
+
+
+async def wait_for_breakpoint_resume_or_control(event, node_id, memory):
+    while not event.is_set():
+        stop_action = await apply_stop_intervention(node_id=node_id, memory=memory)
+        if stop_action:
+            return stop_action
+
+        restart_action = await apply_restart_intervention(
+            node_id=node_id,
+            memory=memory,
+        )
+        if restart_action:
+            clear_breakpoint_intervention(node_id=node_id, memory=memory)
+            return restart_action
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=0.1)
+        except asyncio.TimeoutError:
+            pass
+
+    return None
+
+
+def clear_breakpoint_intervention(node_id, memory):
+    server = memory["server"]
+    client_id = memory.get("client_id", server.client_id)
+    workflow_id = memory.get("workflow_id", server.current_workflow_id)
+    interventions = get_workflow_interventions(
+        server=server,
+        client_id=client_id,
+        workflow_id=workflow_id,
+    )
+    breakpoints = interventions.get("breakpoints")
+    if not breakpoints:
+        return
+
+    event = breakpoints.get("nodes", {}).pop(node_id, None)
+    if event:
+        event.set()
+
+
+async def apply_stop_intervention(node_id, memory):
+    server = memory["server"]
+    client_id = memory.get("client_id", server.client_id)
+    workflow_id = memory.get("workflow_id", server.current_workflow_id)
+    interventions = get_workflow_interventions(
+        server=server,
+        client_id=client_id,
+        workflow_id=workflow_id,
+    )
+    stop_points = interventions.get("stop-points")
+    if not stop_points:
+        return None
+
+    all_stop = stop_points.get("all_stop", False)
+    in_list = node_id in stop_points.get("nodes", {})
+    if not (all_stop or in_list):
+        return None
+
+    await server.send_json(
+        event="message",
+        data={"stop-point": node_id},
+        sid=client_id,
+    )
+    stop_points["all_stop"] = False
+    return EvaluationAction(
+        node_id=node_id, runtime_action=RuntimeAction.RETURN
+    ).to_dict()
+
+
+async def apply_restart_intervention(node_id, memory):
+    server = memory["server"]
+    client_id = memory.get("client_id", server.client_id)
+    workflow_id = memory.get("workflow_id", server.current_workflow_id)
+    interventions = get_workflow_interventions(
+        server=server,
+        client_id=client_id,
+        workflow_id=workflow_id,
+    )
+    restart_points = interventions.get("restart-points")
+    if not restart_points:
+        return None
+
+    all_restart = restart_points.get("all_restart", False)
+    in_list = node_id in restart_points.get("nodes", {})
+    if not (all_restart or in_list):
+        return None
+
+    await server.send_json(
+        event="message",
+        data={"restart-point": node_id},
+        sid=client_id,
+    )
+    restart_points["all_restart"] = False
+    return EvaluationAction(
+        node_id=node_id,
+        runtime_action=RuntimeAction.GOTO,
+        destination_node_id=memory["graph_nodes"][0],
+    ).to_dict()
 
 
 def get_or_create_node(node_id, graph_node, memory):
