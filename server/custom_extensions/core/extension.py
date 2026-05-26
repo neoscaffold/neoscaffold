@@ -7235,6 +7235,145 @@ class ImageDownloadToFile:
             return {"error": str(e)}
 
 
+class VideoDownloadToFile:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "video"
+    DESCRIPTION = "Downloads a video URL and stores it at a destination path that includes the filename."
+
+    INPUT = {
+        "required_inputs": {
+            "video_url": {
+                "kind": "string",
+                "name": "video_url",
+                "widget": {"kind": "string", "name": "video_url", "default": ""},
+            },
+            "destination_path": {
+                "kind": "string",
+                "name": "destination_path",
+                "widget": {
+                    "kind": "string",
+                    "name": "destination_path",
+                    "default": "downloaded_video.mp4",
+                },
+            },
+        },
+        "optional_inputs": {
+            "timeout": {
+                "kind": "*",
+                "name": "timeout",
+                "widget": {"kind": "number", "name": "timeout", "default": 30},
+            },
+            "overwrite": {
+                "kind": "*",
+                "name": "overwrite",
+                "widget": {"kind": "string", "name": "overwrite", "default": "true"},
+            },
+            "user_agent": {
+                "kind": "*",
+                "name": "user_agent",
+                "widget": {
+                    "kind": "string",
+                    "name": "user_agent",
+                    "default": "NeoScaffold/1.0",
+                },
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "*",
+        "cacheable": False,
+    }
+
+    def _input_value(self, node_inputs, group, name, default=None):
+        return node_inputs.get(group, {}).get(name, {}).get("values", default)
+
+    def _is_truthy(self, value):
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "y", "on")
+        return bool(value)
+
+    def evaluate(self, node_inputs):
+        try:
+            import os
+            import tempfile
+            import urllib.parse
+            import urllib.request
+
+            video_url = self._input_value(
+                node_inputs, "required_inputs", "video_url", ""
+            )
+            destination_path = self._input_value(
+                node_inputs, "required_inputs", "destination_path", ""
+            )
+            timeout = float(
+                self._input_value(node_inputs, "optional_inputs", "timeout", 30) or 30
+            )
+            overwrite = self._is_truthy(
+                self._input_value(node_inputs, "optional_inputs", "overwrite", True)
+            )
+            user_agent = self._input_value(
+                node_inputs, "optional_inputs", "user_agent", "NeoScaffold/1.0"
+            )
+
+            if not video_url:
+                raise ValueError("video_url is required")
+            if not destination_path:
+                raise ValueError("destination_path is required")
+            if os.path.basename(destination_path) in ("", ".", ".."):
+                raise ValueError("destination_path must include a filename")
+
+            parsed_url = urllib.parse.urlparse(video_url)
+            if parsed_url.scheme not in ("http", "https"):
+                raise ValueError("video_url must be an http or https URL")
+
+            output_dir = os.path.dirname(destination_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+            if os.path.exists(destination_path) and not overwrite:
+                raise FileExistsError(f"{destination_path} already exists")
+
+            request = urllib.request.Request(
+                video_url,
+                headers={"User-Agent": user_agent or "NeoScaffold/1.0"},
+            )
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                content_type = response.headers.get("Content-Type", "")
+                if content_type and not content_type.lower().startswith("video/"):
+                    raise ValueError(
+                        f"URL returned {content_type!r}, expected a video content type"
+                    )
+
+                fd, temp_path = tempfile.mkstemp(
+                    prefix=".download-",
+                    suffix=".tmp",
+                    dir=output_dir or ".",
+                )
+                bytes_written = 0
+                try:
+                    with os.fdopen(fd, "wb") as video_file:
+                        while True:
+                            chunk = response.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            video_file.write(chunk)
+                            bytes_written += len(chunk)
+                    os.replace(temp_path, destination_path)
+                except Exception:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    raise
+
+            return {
+                "video_path": destination_path,
+                "bytes_written": bytes_written,
+                "content_type": content_type,
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+
 class StringConvertToHex:
     CATEGORY = "utilities"
     SUBCATEGORY = "string"
@@ -23369,6 +23508,11 @@ EXTENSION_MAPPINGS = {
             "python_class": ImageDownloadToFile,
             "javascript_class_name": "ImageDownloadToFile",
             "display_name": "ImageDownloadToFile",
+        },
+        "VideoDownloadToFile": {
+            "python_class": VideoDownloadToFile,
+            "javascript_class_name": "VideoDownloadToFile",
+            "display_name": "VideoDownloadToFile",
         },
         "StringConvertToHex": {
             "python_class": StringConvertToHex,
