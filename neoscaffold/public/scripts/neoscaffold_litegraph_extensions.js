@@ -1159,37 +1159,6 @@
       });
     },
 
-    buildWidgetOptions(widget) {
-      if (!widget || typeof widget !== 'object') {
-        return undefined;
-      }
-
-      const options = {};
-      const widgetKind = widget.kind;
-      const widgetName = widget.name;
-      const isTextWidget = widgetKind === 'string' || widgetKind === 'text';
-
-      if (widget.multiline === true) {
-        options.multiline = true;
-      }
-
-      if (isTextWidget) {
-        const multilineNames = new Set([
-          'prompt',
-          'system_prompt',
-          'developer_prompt',
-          'instructions',
-          'body',
-          'text',
-        ]);
-        if (multilineNames.has(widgetName)) {
-          options.multiline = true;
-        }
-      }
-
-      return Object.keys(options).length ? options : undefined;
-    },
-
     registerNodeType(nodeObject, registeredNodes) {
       // attempt to register from global class instance
       let className = nodeObject['javascript_class_name'];
@@ -1311,7 +1280,6 @@
     },
 
     ruleFactoryBuilder(ruleObject) {
-      let scope = this;
       let title = ruleObject['display_name'] || ruleObject['name'];
       let description = ruleObject['description'] || '';
       let category = ruleObject['category'] || '';
@@ -1969,7 +1937,7 @@
       const downloadName = this.sanitizeExportFilename(
         filename || this.getDefaultExportFilename()
       );
-      const jsonString = JSON.stringify(workflow, null, 2);
+      const jsonString = JSON.stringify(workflow);
 
       const blob = new Blob([jsonString], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -2003,7 +1971,7 @@
         return;
       }
 
-      const jsonString = JSON.stringify(workflow, null, 2);
+      const jsonString = JSON.stringify(workflow);
       const suggestedName = this.getDefaultExportFilename();
 
       if (typeof window.showSaveFilePicker === 'function') {
