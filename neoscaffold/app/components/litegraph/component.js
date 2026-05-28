@@ -14,7 +14,7 @@ export default class LitegraphComponent extends Component {
   @action
   async exportGraph(event) {
     event.preventDefault();
-    NeoScaffold.exportGraph(); // eslint-disable-line
+    await NeoScaffold.exportWorkflowWithSaveDialog(); // eslint-disable-line
   }
 
   @action
