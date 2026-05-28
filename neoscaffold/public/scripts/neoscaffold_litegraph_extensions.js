@@ -1159,6 +1159,37 @@
       });
     },
 
+    buildWidgetOptions(widget) {
+      if (!widget || typeof widget !== 'object') {
+        return undefined;
+      }
+
+      const options = {};
+      const widgetKind = widget.kind;
+      const widgetName = widget.name;
+      const isTextWidget = widgetKind === 'string' || widgetKind === 'text';
+
+      if (widget.multiline === true) {
+        options.multiline = true;
+      }
+
+      if (isTextWidget) {
+        const multilineNames = new Set([
+          'prompt',
+          'system_prompt',
+          'developer_prompt',
+          'instructions',
+          'body',
+          'text',
+        ]);
+        if (multilineNames.has(widgetName)) {
+          options.multiline = true;
+        }
+      }
+
+      return Object.keys(options).length ? options : undefined;
+    },
+
     registerNodeType(nodeObject, registeredNodes) {
       // attempt to register from global class instance
       let className = nodeObject['javascript_class_name'];
@@ -1280,6 +1311,7 @@
     },
 
     ruleFactoryBuilder(ruleObject) {
+      let scope = this;
       let title = ruleObject['display_name'] || ruleObject['name'];
       let description = ruleObject['description'] || '';
       let category = ruleObject['category'] || '';
@@ -1909,21 +1941,100 @@
       }
     },
 
-    async exportWorkflow() {
+    getDefaultExportFilename() {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('neoscaffold_export_filename');
+        if (stored) {
+          return stored;
+        }
+      }
+      return 'nsgraph.json';
+    },
+
+    sanitizeExportFilename(name) {
+      let filename = String(name || 'nsgraph').trim() || 'nsgraph';
+      filename = filename.replace(/[/\\?%*:|"<>]/g, '_');
+      if (!filename.toLowerCase().endsWith('.json')) {
+        filename += '.json';
+      }
+      return filename;
+    },
+
+    async exportWorkflow(filename) {
       const workflow = await this.export();
-      const jsonString = JSON.stringify(workflow);
+      if (!workflow) {
+        return;
+      }
+
+      const downloadName = this.sanitizeExportFilename(
+        filename || this.getDefaultExportFilename()
+      );
+      const jsonString = JSON.stringify(workflow, null, 2);
 
       const blob = new Blob([jsonString], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
 
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'nsgraph.json'; // The filename for the download
-      document.body.appendChild(a); // Append to the document
-      a.click(); // Trigger the download
+      a.download = downloadName;
+      document.body.appendChild(a);
+      a.click();
 
-      document.body.removeChild(a); // Clean up
-      URL.revokeObjectURL(url); // Free up memory
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('neoscaffold_export_filename', downloadName);
+      }
+    },
+
+    async exportWorkflowWithPrompt() {
+      const defaultName = this.getDefaultExportFilename();
+      const entered = window.prompt('Save workflow as:', defaultName);
+      if (entered === null) {
+        return;
+      }
+      await this.exportWorkflow(entered);
+    },
+
+    async exportWorkflowWithSaveDialog() {
+      const workflow = await this.export();
+      if (!workflow) {
+        return;
+      }
+
+      const jsonString = JSON.stringify(workflow, null, 2);
+      const suggestedName = this.getDefaultExportFilename();
+
+      if (typeof window.showSaveFilePicker === 'function') {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName,
+            types: [{
+              description: 'NeoScaffold workflow',
+              accept: { 'application/json': ['.json'] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(jsonString);
+          await writable.close();
+
+          if (handle.name && typeof localStorage !== 'undefined') {
+            localStorage.setItem('neoscaffold_export_filename', handle.name);
+          }
+          return;
+        } catch (error) {
+          if (error && error.name === 'AbortError') {
+            return;
+          }
+          console.warn(
+            'Save file picker failed, falling back to prompt export',
+            error
+          );
+        }
+      }
+
+      await this.exportWorkflowWithPrompt();
     },
 
     async export() {
@@ -2525,7 +2636,7 @@
         },
         {
           label: 'Export',
-          callback: () => NeoScaffold.exportWorkflow()
+          callback: () => NeoScaffold.exportWorkflowWithSaveDialog()
         },
         {
           label: 'Import',
