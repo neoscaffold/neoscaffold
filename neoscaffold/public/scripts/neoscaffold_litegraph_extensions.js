@@ -1211,12 +1211,19 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
+                  // if string we want multiline by default
+                  let widgetOptions = undefined;
+                  if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
+                    widgetOptions = {
+                      multiline: true,
+                    };
+                  }
                   this.addWidget(
                     input['widget']['kind'],
                     input['widget']['name'],
                     input['widget']['default'],
                     input['widget']['name'], // modify the uri property
-                    undefined // no special options
+                    widgetOptions // no special options
                   );
                 }
               });
@@ -1230,12 +1237,19 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
+                  // if string we want multiline by default
+                  let widgetOptions = undefined;
+                  if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
+                    widgetOptions = {
+                      multiline: true,
+                    };
+                  }
                   this.addWidget(
                     input['widget']['kind'],
                     input['widget']['name'],
                     input['widget']['default'],
                     input['widget']['name'], // modify the uri property
-                    undefined // no special options
+                    widgetOptions // no special options
                   );
                 }
               });
@@ -1302,12 +1316,18 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
+                  let widgetOptions = undefined;
+                  if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
+                    widgetOptions = {
+                      multiline: true,
+                    };
+                  }
                   this.addWidget(
                     input['widget']['kind'],
                     input['widget']['name'],
                     input['widget']['default'],
                     input['widget']['name'], // modify the uri property
-                    undefined // no special options
+                    widgetOptions // no special options
                   );
                 }
               });
@@ -1321,12 +1341,18 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
+                  let widgetOptions = undefined;
+                  if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
+                    widgetOptions = {
+                      multiline: true,
+                    };
+                  }
                   this.addWidget(
                     input['widget']['kind'],
                     input['widget']['name'],
                     input['widget']['default'],
                     input['widget']['name'], // modify the uri property
-                    undefined // no special options
+                    widgetOptions // no special options
                   );
                 }
               });
