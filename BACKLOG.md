@@ -26,3 +26,4 @@ the text box should be better, specifically resizable and optionally centered on
 -Display integers as integers and not as floats.
 -Overlay that highlight certain things: e.g. variables.
 -Document and make static variables easier to indentify because they are time/ position irrelevent.
+-Hashmaps/ Dict: specific operations (e.g. needed for video shot creation in parallel).
