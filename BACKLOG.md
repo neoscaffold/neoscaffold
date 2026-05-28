@@ -22,3 +22,7 @@ the text box should be better, specifically resizable and optionally centered on
 -Saveas (filename and choose directory).
 -White space preserving input node.
 -Put back booleans.
+-Zoom in / Zoom out controls.
+-Display integers as integers and not as floats.
+-Overlay that highlight certain things: e.g. variables.
+-Document and make static variables easier to indentify because they are time/ position irrelevent.
