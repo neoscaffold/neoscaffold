@@ -1211,19 +1211,21 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
-                  // if string we want multiline by default
                   let widgetOptions = undefined;
                   if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
-                    widgetOptions = {
-                      multiline: true,
-                    };
+                    widgetOptions = { multiline: true };
+                  } else if (
+                    nodeObject['javascript_class_name'] === 'nsInteger' &&
+                    input['widget']['kind'] === 'number'
+                  ) {
+                    widgetOptions = { step: 1, precision: 0, integer: true };
                   }
                   this.addWidget(
                     input['widget']['kind'],
                     input['widget']['name'],
                     input['widget']['default'],
                     input['widget']['name'], // modify the uri property
-                    widgetOptions // no special options
+                    widgetOptions
                   );
                 }
               });
@@ -1237,19 +1239,21 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
-                  // if string we want multiline by default
                   let widgetOptions = undefined;
                   if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
-                    widgetOptions = {
-                      multiline: true,
-                    };
+                    widgetOptions = { multiline: true };
+                  } else if (
+                    nodeObject['javascript_class_name'] === 'nsInteger' &&
+                    input['widget']['kind'] === 'number'
+                  ) {
+                    widgetOptions = { step: 1, precision: 0, integer: true };
                   }
                   this.addWidget(
                     input['widget']['kind'],
                     input['widget']['name'],
                     input['widget']['default'],
                     input['widget']['name'], // modify the uri property
-                    widgetOptions // no special options
+                    widgetOptions
                   );
                 }
               });
