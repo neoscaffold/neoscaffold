@@ -164,7 +164,14 @@ class nsInteger:
             "value": {
                 "kind": "number",
                 "name": "value",
-                "widget": {"kind": "number", "name": "value", "default": 0},
+                "widget": {
+                    "kind": "number",
+                    "name": "value",
+                    "default": 0,
+                    "step": 10,
+                    "precision": 0,
+                    "integer": True,
+                },
             },
         }
     }
@@ -177,13 +184,14 @@ class nsInteger:
     }
 
     def evaluate(self, node_inputs):
+        self.value = 0
         if node_inputs.get("required_inputs"):
             if "value" in node_inputs.get("required_inputs"):
                 self.value = (
                     node_inputs.get("required_inputs").get("value").get("values")
                 )
 
-        return int(self.value)
+        return int(round(float(self.value)))
 
 
 class nsFloat:

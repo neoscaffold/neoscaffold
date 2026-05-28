@@ -10320,6 +10320,9 @@ this.offset[1] += delta_offset[1];
             w.type == 'number'
           ) {
             if (deltaX) w.value += deltaX * 0.1 * (w.options.step || 1);
+            if (w.options.integer) {
+              w.value = Math.round(w.value);
+            }
             if (w.options.min != null && w.value < w.options.min) {
               w.value = w.options.min;
             }
@@ -10340,6 +10343,9 @@ this.offset[1] += delta_offset[1];
             var delta = x < 40 ? -1 : x > widget_width - 40 ? 1 : 0;
             if (w.type == 'number') {
               w.value += delta * 0.1 * (w.options.step || 1);
+              if (w.options.integer) {
+                w.value = Math.round(w.value);
+              }
               if (w.options.min != null && w.value < w.options.min) {
                 w.value = w.options.min;
               }
@@ -10394,14 +10400,18 @@ this.offset[1] += delta_offset[1];
                 'Value',
                 w.value,
                 function (v) {
-                  // check if v is a valid equation or a number
-                  if (/^[0-9+\-*/()\s]+|\d+\.\d+$/.test(v)) {
-                    try {
-                      //solve the equation if possible
-                      v = eval(v);
-                    } catch (e) {}
+                  if (this.options.integer) {
+                    this.value = Math.round(Number(v) || 0);
+                  } else {
+                    // check if v is a valid equation or a number
+                    if (/^[0-9+\-*/()\s]+|\d+\.\d+$/.test(v)) {
+                      try {
+                        //solve the equation if possible
+                        v = eval(v);
+                      } catch (e) {}
+                    }
+                    this.value = Number(v);
                   }
-                  this.value = Number(v);
                   inner_value_change(this, this.value);
                 }.bind(w),
                 event,

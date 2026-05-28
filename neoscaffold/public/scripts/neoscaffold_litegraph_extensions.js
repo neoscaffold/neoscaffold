@@ -1159,6 +1159,48 @@
       });
     },
 
+    buildWidgetOptions(widget, nodeObject) {
+      if (!widget || typeof widget !== 'object') {
+        return undefined;
+      }
+
+      const options = {};
+      const widgetKind = widget.kind;
+      const widgetName = widget.name;
+      const nodeClassName = nodeObject && nodeObject.javascript_class_name;
+      const isTextWidget = widgetKind === 'string' || widgetKind === 'text';
+      const isIntegerNode = nodeClassName === 'nsInteger';
+      const isIntegerNumberWidget =
+        widgetKind === 'number' && (widget.integer === true || isIntegerNode);
+
+      if (widget.multiline === true) {
+        options.multiline = true;
+      }
+
+      if (isTextWidget) {
+        const multilineNames = new Set([
+          'prompt',
+          'system_prompt',
+          'developer_prompt',
+          'instructions',
+          'body',
+          'text',
+        ]);
+        if (multilineNames.has(widgetName)) {
+          options.multiline = true;
+        }
+      }
+
+      if (isIntegerNumberWidget) {
+        // LiteGraph uses delta * 0.1 * step; step 10 => whole-number increments
+        options.step = widget.step != null ? widget.step : 10;
+        options.precision = widget.precision != null ? widget.precision : 0;
+        options.integer = true;
+      }
+
+      return Object.keys(options).length ? options : undefined;
+    },
+
     registerNodeType(nodeObject, registeredNodes) {
       // attempt to register from global class instance
       let className = nodeObject['javascript_class_name'];
@@ -1211,19 +1253,12 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
-                  // if string we want multiline by default
-                  let widgetOptions = undefined;
-                  if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
-                    widgetOptions = {
-                      multiline: true,
-                    };
-                  }
                   this.addWidget(
-                    input['widget']['kind'],
-                    input['widget']['name'],
-                    input['widget']['default'],
-                    input['widget']['name'], // modify the uri property
-                    widgetOptions // no special options
+                    widget.kind,
+                    widget.name,
+                    widget.default,
+                    widget.name,
+                    scope.buildWidgetOptions(widget, nodeObject)
                   );
                 }
               });
@@ -1237,19 +1272,12 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
-                  // if string we want multiline by default
-                  let widgetOptions = undefined;
-                  if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
-                    widgetOptions = {
-                      multiline: true,
-                    };
-                  }
                   this.addWidget(
-                    input['widget']['kind'],
-                    input['widget']['name'],
-                    input['widget']['default'],
-                    input['widget']['name'], // modify the uri property
-                    widgetOptions // no special options
+                    widget.kind,
+                    widget.name,
+                    widget.default,
+                    widget.name,
+                    scope.buildWidgetOptions(widget, nodeObject)
                   );
                 }
               });
@@ -1294,6 +1322,7 @@
     },
 
     ruleFactoryBuilder(ruleObject) {
+      let scope = this;
       let title = ruleObject['display_name'] || ruleObject['name'];
       let description = ruleObject['description'] || '';
       let category = ruleObject['category'] || '';
@@ -1316,18 +1345,12 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
-                  let widgetOptions = undefined;
-                  if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
-                    widgetOptions = {
-                      multiline: true,
-                    };
-                  }
                   this.addWidget(
-                    input['widget']['kind'],
-                    input['widget']['name'],
-                    input['widget']['default'],
-                    input['widget']['name'], // modify the uri property
-                    widgetOptions // no special options
+                    widget.kind,
+                    widget.name,
+                    widget.default,
+                    widget.name,
+                    scope.buildWidgetOptions(widget, ruleObject)
                   );
                 }
               });
@@ -1341,18 +1364,12 @@
                 this.addInput(input['name'], input['kind']);
                 let widget = input['widget'];
                 if (widget && typeof widget === 'object') {
-                  let widgetOptions = undefined;
-                  if (input['widget']['kind'] === 'string' || input['widget']['kind'] === 'text') {
-                    widgetOptions = {
-                      multiline: true,
-                    };
-                  }
                   this.addWidget(
-                    input['widget']['kind'],
-                    input['widget']['name'],
-                    input['widget']['default'],
-                    input['widget']['name'], // modify the uri property
-                    widgetOptions // no special options
+                    widget.kind,
+                    widget.name,
+                    widget.default,
+                    widget.name,
+                    scope.buildWidgetOptions(widget, ruleObject)
                   );
                 }
               });
