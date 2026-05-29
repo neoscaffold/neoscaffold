@@ -1219,6 +1219,50 @@
       let description = nodeObject['description'] || '';
       let category = nodeObject['category'] || '';
       let subcategory = nodeObject['subcategory'] || '';
+      const isIntegerNode = nodeObject['javascript_class_name'] === 'nsInteger';
+      const staticProps = {
+        title,
+        description,
+        category,
+        subcategory,
+        serialize_widgets: true,
+      };
+      if (isIntegerNode) {
+        staticProps.onConfigure = function() {
+          if (!this.widgets) {
+            return;
+          }
+          this.widgets.forEach(function(integerWidget) {
+            if (
+              integerWidget.type !== 'number' ||
+              !integerWidget.options ||
+              !integerWidget.options.integer ||
+              integerWidget._neoIntegerValueWrapped
+            ) {
+              return;
+            }
+            integerWidget._neoIntegerValueWrapped = true;
+            let stored = Math.round(Number(integerWidget.value));
+            if (!Number.isFinite(stored)) {
+              stored = 0;
+            }
+            Object.defineProperty(integerWidget, 'value', {
+              get() {
+                return stored;
+              },
+              set(v) {
+                let n = Number(v);
+                if (!Number.isFinite(n)) {
+                  return;
+                }
+                stored = Math.round(n);
+              },
+              enumerable: true,
+              configurable: true,
+            });
+          });
+        };
+      }
 
       return Object.assign(
         function NeoScaffoldNode() {
@@ -1252,6 +1296,30 @@
                     input['widget']['name'], // modify the uri property
                     widgetOptions
                   );
+                  if (widgetOptions && widgetOptions.integer) {
+                    let integerWidget = this.widgets[this.widgets.length - 1];
+                    if (integerWidget && !integerWidget._neoIntegerValueWrapped) {
+                      integerWidget._neoIntegerValueWrapped = true;
+                      let stored = Math.round(Number(integerWidget.value));
+                      if (!Number.isFinite(stored)) {
+                        stored = 0;
+                      }
+                      Object.defineProperty(integerWidget, 'value', {
+                        get() {
+                          return stored;
+                        },
+                        set(v) {
+                          let n = Number(v);
+                          if (!Number.isFinite(n)) {
+                            return;
+                          }
+                          stored = Math.round(n);
+                        },
+                        enumerable: true,
+                        configurable: true,
+                      });
+                    }
+                  }
                 }
               });
             }
@@ -1280,6 +1348,30 @@
                     input['widget']['name'], // modify the uri property
                     widgetOptions
                   );
+                  if (widgetOptions && widgetOptions.integer) {
+                    let integerWidget = this.widgets[this.widgets.length - 1];
+                    if (integerWidget && !integerWidget._neoIntegerValueWrapped) {
+                      integerWidget._neoIntegerValueWrapped = true;
+                      let stored = Math.round(Number(integerWidget.value));
+                      if (!Number.isFinite(stored)) {
+                        stored = 0;
+                      }
+                      Object.defineProperty(integerWidget, 'value', {
+                        get() {
+                          return stored;
+                        },
+                        set(v) {
+                          let n = Number(v);
+                          if (!Number.isFinite(n)) {
+                            return;
+                          }
+                          stored = Math.round(n);
+                        },
+                        enumerable: true,
+                        configurable: true,
+                      });
+                    }
+                  }
                 }
               });
             }
@@ -1298,13 +1390,7 @@
           scope.addNodeStatusWidget(this);
           scope.addColorMethods(this);
         },
-        {
-          title,
-          description,
-          category,
-          subcategory,
-          serialize_widgets: true,
-        }
+        staticProps
       );
     },
 
@@ -2194,6 +2280,38 @@
             hook.bind(scope)(node, node.type);
           });
         }
+
+        if (node.type === 'nsInteger' && node.widgets) {
+          node.widgets.forEach(function(integerWidget) {
+            if (
+              integerWidget.type !== 'number' ||
+              !integerWidget.options ||
+              !integerWidget.options.integer ||
+              integerWidget._neoIntegerValueWrapped
+            ) {
+              return;
+            }
+            integerWidget._neoIntegerValueWrapped = true;
+            let stored = Math.round(Number(integerWidget.value));
+            if (!Number.isFinite(stored)) {
+              stored = 0;
+            }
+            Object.defineProperty(integerWidget, 'value', {
+              get() {
+                return stored;
+              },
+              set(v) {
+                let n = Number(v);
+                if (!Number.isFinite(n)) {
+                  return;
+                }
+                stored = Math.round(n);
+              },
+              enumerable: true,
+              configurable: true,
+            });
+          });
+        }
       });
 
       if (missingNodeTypes.length) {
@@ -2672,14 +2790,82 @@
 
     addSideMenuOptions(canvas) {
       // Create floating side menu container
-      let sideMenu = document.createElement('div');
+      const sideMenu = document.createElement('div');
       sideMenu.style.position = 'absolute';
       sideMenu.style.backgroundColor = '#2c2c2c';
       sideMenu.style.padding = '10px';
       sideMenu.style.borderRadius = '5px';
       sideMenu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
       sideMenu.style.zIndex = '1000';
+      sideMenu.dataset.collapsed = 'false';
       sideMenu.classList.add('neoscaffold-side-menu');
+
+      const menuContent = document.createElement('div');
+      menuContent.style.paddingTop = '24px';
+      menuContent.classList.add('neoscaffold-side-menu-content');
+
+      const createSideMenuButton = function(label, title, callback) {
+        const button = document.createElement('button');
+        button.innerText = label;
+        button.title = title;
+        button.setAttribute('aria-label', title);
+        button.style.display = 'block';
+        button.style.width = '100%';
+        button.style.padding = '8px 15px';
+        button.style.marginBottom = '5px';
+        button.style.border = 'none';
+        button.style.borderRadius = '3px';
+        button.style.backgroundColor = '#3c3c3c';
+        button.style.color = '#fff';
+        button.style.cursor = 'pointer';
+
+        button.addEventListener('mouseover', () => {
+          button.style.backgroundColor = '#4c4c4c';
+        });
+
+        button.addEventListener('mouseout', () => {
+          button.style.backgroundColor = '#3c3c3c';
+        });
+
+        button.addEventListener('click', callback);
+        return button;
+      };
+
+      const collapseButton = document.createElement('button');
+      collapseButton.innerText = '›';
+      collapseButton.title = 'Collapse Menu';
+      collapseButton.setAttribute('aria-label', 'Collapse Menu');
+      collapseButton.style.position = 'absolute';
+      collapseButton.style.top = '6px';
+      collapseButton.style.right = '6px';
+      collapseButton.style.width = '24px';
+      collapseButton.style.height = '24px';
+      collapseButton.style.padding = '0';
+      collapseButton.style.border = 'none';
+      collapseButton.style.borderRadius = '3px';
+      collapseButton.style.backgroundColor = '#3c3c3c';
+      collapseButton.style.color = '#fff';
+      collapseButton.style.cursor = 'pointer';
+      collapseButton.style.lineHeight = '24px';
+
+      collapseButton.addEventListener('mouseover', () => {
+        collapseButton.style.backgroundColor = '#4c4c4c';
+      });
+
+      collapseButton.addEventListener('mouseout', () => {
+        collapseButton.style.backgroundColor = '#3c3c3c';
+      });
+
+      collapseButton.addEventListener('click', () => {
+        const isCollapsed = sideMenu.dataset.collapsed === 'true';
+        sideMenu.dataset.collapsed = isCollapsed ? 'false' : 'true';
+        menuContent.style.display = isCollapsed ? 'block' : 'none';
+        collapseButton.innerText = isCollapsed ? '›' : '‹';
+        collapseButton.title = isCollapsed ? 'Collapse Menu' : 'Expand Menu';
+        collapseButton.setAttribute('aria-label', collapseButton.title);
+        this.updateSideMenuPosition(canvas);
+      });
+      sideMenu.appendChild(collapseButton);
 
       // Add buttons to side menu
       const menuItems = [
@@ -2726,31 +2912,10 @@
       ];
 
       menuItems.forEach(item => {
-        let button = document.createElement('button');
-        button.innerText = item.label;
-        button.title = item.title;
-        button.setAttribute('aria-label', item.title);
-        button.style.display = 'block';
-        button.style.width = '100%';
-        button.style.padding = '8px 15px';
-        button.style.marginBottom = '5px';
-        button.style.border = 'none';
-        button.style.borderRadius = '3px';
-        button.style.backgroundColor = '#3c3c3c';
-        button.style.color = '#fff';
-        button.style.cursor = 'pointer';
-
-        button.addEventListener('mouseover', () => {
-          button.style.backgroundColor = '#4c4c4c';
-        });
-
-        button.addEventListener('mouseout', () => {
-          button.style.backgroundColor = '#3c3c3c';
-        });
-
-        button.addEventListener('click', item.callback);
-        sideMenu.appendChild(button);
+        const button = createSideMenuButton(item.label, item.title, item.callback);
+        menuContent.appendChild(button);
       });
+      sideMenu.appendChild(menuContent);
 
       canvas.canvas.parentElement.appendChild(sideMenu);
 
@@ -2771,8 +2936,18 @@
       const canvasContainerWidth = canvasContainer.clientWidth;
 
       for (const sideMenu of sideMenus) {
-        // side menu should be 1/5 of the canvas width or 150px, whichever is greater
-        sideMenu.style.width = `${Math.max(canvasContainerWidth / 5, 150)}px`;
+        if (sideMenu.dataset.collapsed === 'true') {
+          sideMenu.style.width = '36px';
+          sideMenu.style.minWidth = '36px';
+          sideMenu.style.height = '36px';
+          sideMenu.style.padding = '0';
+        } else {
+          // side menu should be 1/5 of the canvas width or 150px, whichever is greater
+          sideMenu.style.width = `${Math.max(canvasContainerWidth / 5, 150)}px`;
+          sideMenu.style.minWidth = '';
+          sideMenu.style.height = '';
+          sideMenu.style.padding = '10px';
+        }
 
         const sideMenuRect = sideMenu.getBoundingClientRect();
         const sideMenuX = canvasContainerWidth - sideMenuRect.width - 30;
