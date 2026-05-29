@@ -13,7 +13,6 @@ the text box should be better, specifically resizable and optionally centered on
 -Ablilty to disable node (similar to commenting out).
 -Add background image?
 -Saveas (filename and choose directory).
--White space preserving input node.
 -Put back booleans.
 -Zoom in / Zoom out controls.
 -Display integers as integers and not as floats.
