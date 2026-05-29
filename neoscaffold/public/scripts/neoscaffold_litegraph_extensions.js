@@ -1194,6 +1194,50 @@
       let description = nodeObject['description'] || '';
       let category = nodeObject['category'] || '';
       let subcategory = nodeObject['subcategory'] || '';
+      const isIntegerNode = nodeObject['javascript_class_name'] === 'nsInteger';
+      const staticProps = {
+        title,
+        description,
+        category,
+        subcategory,
+        serialize_widgets: true,
+      };
+      if (isIntegerNode) {
+        staticProps.onConfigure = function() {
+          if (!this.widgets) {
+            return;
+          }
+          this.widgets.forEach(function(integerWidget) {
+            if (
+              integerWidget.type !== 'number' ||
+              !integerWidget.options ||
+              !integerWidget.options.integer ||
+              integerWidget._neoIntegerValueWrapped
+            ) {
+              return;
+            }
+            integerWidget._neoIntegerValueWrapped = true;
+            let stored = Math.round(Number(integerWidget.value));
+            if (!Number.isFinite(stored)) {
+              stored = 0;
+            }
+            Object.defineProperty(integerWidget, 'value', {
+              get() {
+                return stored;
+              },
+              set(v) {
+                let n = Number(v);
+                if (!Number.isFinite(n)) {
+                  return;
+                }
+                stored = Math.round(n);
+              },
+              enumerable: true,
+              configurable: true,
+            });
+          });
+        };
+      }
 
       return Object.assign(
         function NeoScaffoldNode() {
@@ -1227,6 +1271,30 @@
                     input['widget']['name'], // modify the uri property
                     widgetOptions
                   );
+                  if (widgetOptions && widgetOptions.integer) {
+                    let integerWidget = this.widgets[this.widgets.length - 1];
+                    if (integerWidget && !integerWidget._neoIntegerValueWrapped) {
+                      integerWidget._neoIntegerValueWrapped = true;
+                      let stored = Math.round(Number(integerWidget.value));
+                      if (!Number.isFinite(stored)) {
+                        stored = 0;
+                      }
+                      Object.defineProperty(integerWidget, 'value', {
+                        get() {
+                          return stored;
+                        },
+                        set(v) {
+                          let n = Number(v);
+                          if (!Number.isFinite(n)) {
+                            return;
+                          }
+                          stored = Math.round(n);
+                        },
+                        enumerable: true,
+                        configurable: true,
+                      });
+                    }
+                  }
                 }
               });
             }
@@ -1255,6 +1323,30 @@
                     input['widget']['name'], // modify the uri property
                     widgetOptions
                   );
+                  if (widgetOptions && widgetOptions.integer) {
+                    let integerWidget = this.widgets[this.widgets.length - 1];
+                    if (integerWidget && !integerWidget._neoIntegerValueWrapped) {
+                      integerWidget._neoIntegerValueWrapped = true;
+                      let stored = Math.round(Number(integerWidget.value));
+                      if (!Number.isFinite(stored)) {
+                        stored = 0;
+                      }
+                      Object.defineProperty(integerWidget, 'value', {
+                        get() {
+                          return stored;
+                        },
+                        set(v) {
+                          let n = Number(v);
+                          if (!Number.isFinite(n)) {
+                            return;
+                          }
+                          stored = Math.round(n);
+                        },
+                        enumerable: true,
+                        configurable: true,
+                      });
+                    }
+                  }
                 }
               });
             }
@@ -1273,13 +1365,7 @@
           scope.addNodeStatusWidget(this);
           scope.addColorMethods(this);
         },
-        {
-          title,
-          description,
-          category,
-          subcategory,
-          serialize_widgets: true,
-        }
+        staticProps
       );
     },
 
@@ -2167,6 +2253,38 @@
           node.hooks.didLoad.forEach((hook) => {
             // scope is NeoScaffold and the nodeObject is the nodeObject from the extension
             hook.bind(scope)(node, node.type);
+          });
+        }
+
+        if (node.type === 'nsInteger' && node.widgets) {
+          node.widgets.forEach(function(integerWidget) {
+            if (
+              integerWidget.type !== 'number' ||
+              !integerWidget.options ||
+              !integerWidget.options.integer ||
+              integerWidget._neoIntegerValueWrapped
+            ) {
+              return;
+            }
+            integerWidget._neoIntegerValueWrapped = true;
+            let stored = Math.round(Number(integerWidget.value));
+            if (!Number.isFinite(stored)) {
+              stored = 0;
+            }
+            Object.defineProperty(integerWidget, 'value', {
+              get() {
+                return stored;
+              },
+              set(v) {
+                let n = Number(v);
+                if (!Number.isFinite(n)) {
+                  return;
+                }
+                stored = Math.round(n);
+              },
+              enumerable: true,
+              configurable: true,
+            });
           });
         }
       });
