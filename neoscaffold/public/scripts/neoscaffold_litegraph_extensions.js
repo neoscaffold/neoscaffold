@@ -1939,6 +1939,47 @@
       }
     },
 
+    importGraphIntoCurrentFromFile(canvas) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json,.json';
+      input.style.display = 'none';
+      input.addEventListener('change', (event) => {
+        this.importGraphIntoCurrent(event, canvas);
+        document.body.removeChild(input);
+      });
+      input.addEventListener('cancel', () => {
+        document.body.removeChild(input);
+      });
+
+      document.body.appendChild(input);
+      input.click();
+    },
+
+    importGraphIntoCurrent(event, canvas) {
+      const file = event.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const graphObject = JSON.parse(e.target.result);
+          await this.mergeWorkflowGraph(graphObject, canvas);
+        } catch (error) {
+          console.error("Error importing workflow into current graph:", error);
+          alert('Could not import workflow: ' + error.message);
+        }
+      };
+
+      reader.onerror = (e) => {
+        console.error("Error reading file:", e.target.error);
+      };
+
+      reader.readAsText(file);
+    },
+
     getDefaultExportFilename() {
       if (typeof localStorage !== 'undefined') {
         const stored = localStorage.getItem('neoscaffold_export_filename');
@@ -2179,6 +2220,127 @@
 
       this.graphImport = this.graph;
       return this.graphImport;
+    },
+
+    async mergeWorkflowGraph(graphObject, canvas) {
+      if (!this.graph || !graphObject || !Array.isArray(graphObject.nodes)) {
+        return;
+      }
+
+      const scope = this;
+      const targetCanvas = canvas || this.litegraphCanvas;
+      const currentGraph = this.graph.serialize();
+      const importedGraph = typeof structuredClone === 'undefined'
+        ? JSON.parse(JSON.stringify(graphObject))
+        : structuredClone(graphObject);
+      const missingNodeTypes = [];
+      const nodeIdMap = {};
+      const linkIdMap = {};
+      const currentNodeIds = currentGraph.nodes.map((node) => Number(node.id) || 0);
+      const currentLinkIds = (currentGraph.links || []).map((link) => {
+        return Number(Array.isArray(link) ? link[0] : link.id) || 0;
+      });
+      let nextNodeId = Math.max(currentGraph.last_node_id || 0, ...currentNodeIds) + 1;
+      let nextLinkId = Math.max(currentGraph.last_link_id || 0, ...currentLinkIds) + 1;
+
+      importedGraph.nodes.forEach((node) => {
+        const oldNodeId = node.id;
+        node.id = nextNodeId++;
+        nodeIdMap[oldNodeId] = node.id;
+        node.pos = Array.isArray(node.pos)
+          ? [node.pos[0] + 40, node.pos[1] + 40]
+          : [40, 40];
+
+        if (!(node.type in LiteGraph.registered_node_types)) {
+          missingNodeTypes.push(node.type);
+          node.type = scope.sanitizeName(node.type);
+        }
+      });
+
+      (importedGraph.links || []).forEach((link) => {
+        if (Array.isArray(link)) {
+          const oldLinkId = link[0];
+          link[0] = nextLinkId++;
+          linkIdMap[oldLinkId] = link[0];
+          link[1] = nodeIdMap[link[1]];
+          link[3] = nodeIdMap[link[3]];
+        } else {
+          const oldLinkId = link.id;
+          link.id = nextLinkId++;
+          linkIdMap[oldLinkId] = link.id;
+          link.origin_id = nodeIdMap[link.origin_id];
+          link.target_id = nodeIdMap[link.target_id];
+        }
+      });
+
+      importedGraph.nodes.forEach((node) => {
+        (node.inputs || []).forEach((input) => {
+          if (input.link != null) {
+            input.link = linkIdMap[input.link];
+          }
+        });
+        (node.outputs || []).forEach((output) => {
+          if (Array.isArray(output.links)) {
+            output.links = output.links
+              .map((linkId) => linkIdMap[linkId])
+              .filter((linkId) => linkId != null);
+          }
+        });
+      });
+
+      const mergedGraph = {
+        ...currentGraph,
+        nodes: currentGraph.nodes.concat(importedGraph.nodes),
+        links: (currentGraph.links || []).concat(importedGraph.links || []),
+        groups: (currentGraph.groups || []).concat(importedGraph.groups || []),
+        last_node_id: nextNodeId - 1,
+        last_link_id: nextLinkId - 1,
+      };
+
+      this.graph.beforeChange();
+      this.graph.configure(mergedGraph);
+      this.graph.afterChange();
+
+      const importedNodeIds = importedGraph.nodes.map((node) => node.id);
+      if (targetCanvas) {
+        Object.values(targetCanvas.selected_nodes || {}).forEach((node) => {
+          node.is_selected = false;
+          if (targetCanvas.onNodeDeselected) {
+            targetCanvas.onNodeDeselected(node);
+          }
+        });
+        targetCanvas.selected_nodes = {};
+
+        importedNodeIds.forEach((nodeId) => {
+          const node = this.graph.getNodeById(nodeId);
+          if (node) {
+            const size = node.computeSize();
+            size[0] = Math.max(node.size[0], size[0]);
+            size[1] = Math.max(node.size[1], size[1]);
+            node.size = size;
+            node.is_selected = true;
+            targetCanvas.selected_nodes[node.id] = node;
+
+            if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('didLoad') && node.hooks.didLoad.length) {
+              node.hooks.didLoad.forEach((hook) => {
+                hook.bind(scope)(node, node.type);
+              });
+            }
+          }
+        });
+
+        const firstImportedNode = this.graph.getNodeById(importedNodeIds[0]);
+        if (firstImportedNode && targetCanvas.centerOnNode) {
+          targetCanvas.centerOnNode(firstImportedNode);
+        }
+        targetCanvas.setDirty(true, true);
+      }
+
+      if (missingNodeTypes.length) {
+        this.showMissingNodesError(missingNodeTypes);
+      }
+
+      return importedNodeIds;
     },
 
     showMissingNodesError(missingNodeTypes) {
@@ -2639,6 +2801,10 @@
         {
           label: 'Import',
           callback: () => document.getElementById('workflow-input').click()
+        },
+        {
+          label: 'Import Into Current',
+          callback: () => NeoScaffold.importGraphIntoCurrentFromFile(canvas)
         },
         {
           label: 'Toggle Breakpoints',
