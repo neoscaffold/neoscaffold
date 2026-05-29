@@ -203,7 +203,12 @@ class GraphExecutor:
             enqueue_ready_nodes()
 
         def is_deferred_control_end_node(node_id):
-            return graph.nodes[node_id].get("kind") in {"EndIfEqual", "EndWhileLoop"}
+            return graph.nodes[node_id].get("kind") in {
+                "EndIfEqual",
+                "EndWhileLoop",
+                "EndForLoop",
+                "EndForEachLoop",
+            }
 
         def pop_next_ready_node():
             for index, node_id in enumerate(ready_queue):

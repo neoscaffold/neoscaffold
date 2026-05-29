@@ -50,6 +50,77 @@ def make_goto_action(node_id, destination_node_id):
     }
 
 
+def get_input_value(node_inputs, input_group, input_name, default=None):
+    return (
+        node_inputs.get(input_group, {})
+        .get(input_name, {})
+        .get("values", default)
+    )
+
+
+def validate_loop_connections(graph, graph_nodes, current_node_id, end_node_kind):
+    connected_node_ids = list(graph.successors(current_node_id))
+    end_loop_node_ids = [
+        node_id
+        for node_id in connected_node_ids
+        if graph.nodes[node_id]["kind"] == end_node_kind
+    ]
+    if len(end_loop_node_ids) != 1:
+        raise Exception(f"Only one {end_node_kind} should be connected to this loop")
+
+    node_id_of_end_loop_node = end_loop_node_ids[0]
+    connected_ids_without_end = [
+        node_id
+        for node_id in connected_node_ids
+        if node_id != node_id_of_end_loop_node
+    ]
+    if len(connected_ids_without_end) < 1:
+        raise Exception(
+            f"At least one node should be connected to this loop other than {end_node_kind}"
+        )
+
+    index_of_node_id = graph_nodes.index(current_node_id)
+    next_node_id_topological = graph_nodes[index_of_node_id + 1]
+    if next_node_id_topological == node_id_of_end_loop_node:
+        raise Exception(f"{end_node_kind} should be placed at the end of the loop.")
+
+    return node_id_of_end_loop_node, next_node_id_topological
+
+
+def loop_should_continue(index, stop, step):
+    if step > 0:
+        return index < stop
+    return index > stop
+
+
+def find_connected_loop_node(graph, current_node_id, loop_node_kind):
+    connected_node_ids = list(graph.predecessors(current_node_id))
+    loop_node_ids = [
+        node_id
+        for node_id in connected_node_ids
+        if graph.nodes[node_id]["kind"] == loop_node_kind
+    ]
+    if len(loop_node_ids) != 1:
+        raise Exception(
+            f"There should be only one {loop_node_kind} connected to this node"
+        )
+
+    return loop_node_ids[0]
+
+
+def find_loop_end_node(graph, loop_node_id, end_node_kind):
+    connected_node_ids = list(graph.successors(loop_node_id))
+    end_loop_node_ids = [
+        node_id
+        for node_id in connected_node_ids
+        if graph.nodes[node_id]["kind"] == end_node_kind
+    ]
+    if len(end_loop_node_ids) != 1:
+        raise Exception(f"Only one {end_node_kind} should be connected to this loop")
+
+    return end_loop_node_ids[0]
+
+
 version = "0.2.0"
 
 
@@ -997,6 +1068,516 @@ class EndWhileLoop:
                 self.node_inputs = node_inputs.get("required_inputs").get("node_inputs")
 
         return {"node_inputs": self.node_inputs, "WhileLoop": self.WhileLoop}
+
+
+class ForLoop:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "iteration"
+    DESCRIPTION = "Repeats nodes over a numeric range"
+
+    INPUT = {
+        "required_inputs": {
+            "start": {
+                "kind": "integer",
+                "name": "start",
+                "widget": {"kind": "number", "name": "start", "default": 0},
+            },
+            "stop": {
+                "kind": "integer",
+                "name": "stop",
+                "widget": {"kind": "number", "name": "stop", "default": 0},
+            },
+        },
+        "optional_inputs": {
+            "step": {
+                "kind": "integer",
+                "name": "step",
+                "widget": {"kind": "number", "name": "step", "default": 1},
+            },
+            "index_key": {
+                "kind": "string",
+                "name": "index_key",
+                "widget": {"kind": "string", "name": "index_key", "default": "index"},
+            },
+            "node_inputs": {
+                "kind": "*",
+                "name": "node_inputs",
+                "widget": {"kind": "string", "name": "node_inputs", "default": ""},
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "control_flow",
+        "name": "loop",
+        "cacheable": False,
+    }
+
+    def evaluate(self, node_inputs):
+        current_node_id = self._node.node_id
+        start = int(get_input_value(node_inputs, "required_inputs", "start", 0))
+        stop = int(get_input_value(node_inputs, "required_inputs", "stop", 0))
+        step = int(get_input_value(node_inputs, "optional_inputs", "step", 1))
+        index_key = get_input_value(
+            node_inputs, "optional_inputs", "index_key", "index"
+        )
+        node_inputs_value = get_input_value(
+            node_inputs, "optional_inputs", "node_inputs", ""
+        )
+
+        if step == 0:
+            raise Exception("ForLoop step cannot be 0")
+
+        graph = self._memory.get("graph")
+        graph_nodes = self._memory.get("graph_nodes")
+        evaluation_override_actions = self._memory.get("evaluation_override_actions")
+        node_id_of_end_loop_node, next_node_id_topological = validate_loop_connections(
+            graph, graph_nodes, current_node_id, "EndForLoop"
+        )
+
+        state_by_node = self._memory.setdefault("_for_loop_state", {})
+        state = state_by_node.setdefault(
+            current_node_id,
+            {"index": start, "iteration": 0, "start": start, "stop": stop, "step": step},
+        )
+
+        index = state["index"]
+        iteration = state["iteration"]
+        if not loop_should_continue(index, stop, step):
+            state_by_node.pop(current_node_id, None)
+            next_action_topological = make_goto_action(
+                current_node_id if self._memory.get("parallel") else next_node_id_topological,
+                node_id_of_end_loop_node,
+            )
+            evaluation_override_actions[current_node_id] = next_action_topological
+            return {"node_inputs": node_inputs_value, "index": index, "iteration": iteration}
+
+        self._memory[index_key] = index
+        state["index"] = index + step
+        state["iteration"] = iteration + 1
+
+        if self._memory.get("parallel"):
+            evaluation_override_actions[current_node_id] = make_goto_action(
+                current_node_id, next_node_id_topological
+            )
+
+        evaluation_override_actions[node_id_of_end_loop_node] = make_goto_action(
+            node_id_of_end_loop_node, current_node_id
+        )
+
+        return {"node_inputs": node_inputs_value, "index": index, "iteration": iteration}
+
+
+class EndForLoop:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "iteration"
+    DESCRIPTION = "Ends ForLoops"
+
+    INPUT = {
+        "required_inputs": {
+            "ForLoop": {"kind": "control_flow", "name": "ForLoop"},
+            "node_inputs": {
+                "kind": "*",
+                "name": "node_inputs",
+            },
+        }
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "*",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        self.ForLoop = None
+        self.node_inputs = None
+
+        if node_inputs.get("required_inputs"):
+            if "ForLoop" in node_inputs.get("required_inputs"):
+                self.ForLoop = node_inputs.get("required_inputs").get("ForLoop")
+            if "node_inputs" in node_inputs.get("required_inputs"):
+                self.node_inputs = node_inputs.get("required_inputs").get("node_inputs")
+
+        return {"node_inputs": self.node_inputs, "ForLoop": self.ForLoop}
+
+
+class BreakForLoop:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "iteration"
+    DESCRIPTION = "Breaks out of ForLoops"
+
+    INPUT = {
+        "required_inputs": {
+            "ForLoop": {"kind": "control_flow", "name": "ForLoop"},
+            "node_inputs": {
+                "kind": "*",
+                "name": "node_inputs",
+            },
+        }
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "*",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        current_node_id = self._node.node_id
+        node_inputs_value = get_input_value(
+            node_inputs, "required_inputs", "node_inputs"
+        )
+
+        graph = self._memory.get("graph")
+        graph_nodes = self._memory.get("graph_nodes")
+        evaluation_override_actions = self._memory.get("evaluation_override_actions")
+        node_id_of_loop_node = find_connected_loop_node(
+            graph, current_node_id, "ForLoop"
+        )
+        node_id_of_end_loop_node = find_loop_end_node(
+            graph, node_id_of_loop_node, "EndForLoop"
+        )
+
+        index_of_node_id = graph_nodes.index(current_node_id)
+        if index_of_node_id < len(graph_nodes) - 1:
+            next_node_id_topological = graph_nodes[index_of_node_id + 1]
+            next_action_topological = make_goto_action(
+                current_node_id if self._memory.get("parallel") else next_node_id_topological,
+                node_id_of_end_loop_node,
+            )
+            override_node_id = (
+                current_node_id
+                if self._memory.get("parallel")
+                else next_node_id_topological
+            )
+            evaluation_override_actions[override_node_id] = next_action_topological
+        else:
+            evaluation_override_actions[current_node_id] = make_goto_action(
+                current_node_id, node_id_of_end_loop_node
+            )
+
+        self._memory.get("_for_loop_state", {}).pop(node_id_of_loop_node, None)
+        return node_inputs_value
+
+
+class ContinueForLoop:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "iteration"
+    DESCRIPTION = "Continues ForLoops"
+
+    INPUT = {
+        "required_inputs": {
+            "ForLoop": {"kind": "control_flow", "name": "ForLoop"},
+            "node_inputs": {
+                "kind": "*",
+                "name": "node_inputs",
+            },
+        }
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "*",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        current_node_id = self._node.node_id
+        node_inputs_value = get_input_value(
+            node_inputs, "required_inputs", "node_inputs"
+        )
+
+        graph = self._memory.get("graph")
+        graph_nodes = self._memory.get("graph_nodes")
+        evaluation_override_actions = self._memory.get("evaluation_override_actions")
+        node_id_of_loop_node = find_connected_loop_node(
+            graph, current_node_id, "ForLoop"
+        )
+
+        index_of_node_id = graph_nodes.index(current_node_id)
+        if index_of_node_id < len(graph_nodes) - 1:
+            next_node_id_topological = graph_nodes[index_of_node_id + 1]
+            next_action_topological = make_goto_action(
+                current_node_id if self._memory.get("parallel") else next_node_id_topological,
+                node_id_of_loop_node,
+            )
+            override_node_id = (
+                current_node_id
+                if self._memory.get("parallel")
+                else node_id_of_loop_node
+            )
+            evaluation_override_actions[override_node_id] = next_action_topological
+        else:
+            evaluation_override_actions[current_node_id] = make_goto_action(
+                current_node_id, node_id_of_loop_node
+            )
+
+        return node_inputs_value
+
+
+class ForEachLoop:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "iteration"
+    DESCRIPTION = "Repeats nodes for each item in an Array or HashMap"
+
+    INPUT = {
+        "required_inputs": {
+            "collection": {
+                "kind": "*",
+                "name": "collection",
+            },
+        },
+        "optional_inputs": {
+            "item_key": {
+                "kind": "string",
+                "name": "item_key",
+                "widget": {"kind": "string", "name": "item_key", "default": "item"},
+            },
+            "key_key": {
+                "kind": "string",
+                "name": "key_key",
+                "widget": {"kind": "string", "name": "key_key", "default": "key"},
+            },
+            "index_key": {
+                "kind": "string",
+                "name": "index_key",
+                "widget": {"kind": "string", "name": "index_key", "default": "index"},
+            },
+            "node_inputs": {
+                "kind": "*",
+                "name": "node_inputs",
+                "widget": {"kind": "string", "name": "node_inputs", "default": ""},
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "control_flow",
+        "name": "loop",
+        "cacheable": False,
+    }
+
+    def evaluate(self, node_inputs):
+        current_node_id = self._node.node_id
+        collection = get_input_value(node_inputs, "required_inputs", "collection", [])
+        item_key = get_input_value(node_inputs, "optional_inputs", "item_key", "item")
+        key_key = get_input_value(node_inputs, "optional_inputs", "key_key", "key")
+        index_key = get_input_value(
+            node_inputs, "optional_inputs", "index_key", "index"
+        )
+        node_inputs_value = get_input_value(
+            node_inputs, "optional_inputs", "node_inputs", ""
+        )
+
+        if isinstance(collection, str):
+            try:
+                collection = json.loads(collection)
+            except json.JSONDecodeError:
+                raise Exception("ForEachLoop collection string must be valid JSON")
+
+        if isinstance(collection, list):
+            items = list(enumerate(collection))
+        elif isinstance(collection, dict):
+            items = list(collection.items())
+        else:
+            raise Exception("ForEachLoop collection must be an Array or HashMap")
+
+        graph = self._memory.get("graph")
+        graph_nodes = self._memory.get("graph_nodes")
+        evaluation_override_actions = self._memory.get("evaluation_override_actions")
+        node_id_of_end_loop_node, next_node_id_topological = validate_loop_connections(
+            graph, graph_nodes, current_node_id, "EndForEachLoop"
+        )
+
+        state_by_node = self._memory.setdefault("_foreach_loop_state", {})
+        state = state_by_node.setdefault(current_node_id, {"index": 0, "items": items})
+        item_index = state["index"]
+        items = state["items"]
+
+        if item_index >= len(items):
+            state_by_node.pop(current_node_id, None)
+            next_action_topological = make_goto_action(
+                current_node_id if self._memory.get("parallel") else next_node_id_topological,
+                node_id_of_end_loop_node,
+            )
+            evaluation_override_actions[current_node_id] = next_action_topological
+            return {
+                "node_inputs": node_inputs_value,
+                "key": None,
+                "item": None,
+                "index": item_index,
+            }
+
+        key, item = items[item_index]
+        self._memory[item_key] = item
+        self._memory[key_key] = key
+        self._memory[index_key] = item_index
+        state["index"] = item_index + 1
+
+        if self._memory.get("parallel"):
+            evaluation_override_actions[current_node_id] = make_goto_action(
+                current_node_id, next_node_id_topological
+            )
+
+        evaluation_override_actions[node_id_of_end_loop_node] = make_goto_action(
+            node_id_of_end_loop_node, current_node_id
+        )
+
+        return {
+            "node_inputs": node_inputs_value,
+            "key": key,
+            "item": item,
+            "index": item_index,
+        }
+
+
+class EndForEachLoop:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "iteration"
+    DESCRIPTION = "Ends ForEachLoops"
+
+    INPUT = {
+        "required_inputs": {
+            "ForEachLoop": {"kind": "control_flow", "name": "ForEachLoop"},
+            "node_inputs": {
+                "kind": "*",
+                "name": "node_inputs",
+            },
+        }
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "*",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        self.ForEachLoop = None
+        self.node_inputs = None
+
+        if node_inputs.get("required_inputs"):
+            if "ForEachLoop" in node_inputs.get("required_inputs"):
+                self.ForEachLoop = node_inputs.get("required_inputs").get("ForEachLoop")
+            if "node_inputs" in node_inputs.get("required_inputs"):
+                self.node_inputs = node_inputs.get("required_inputs").get("node_inputs")
+
+        return {"node_inputs": self.node_inputs, "ForEachLoop": self.ForEachLoop}
+
+
+class BreakForEachLoop:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "iteration"
+    DESCRIPTION = "Breaks out of ForEachLoops"
+
+    INPUT = {
+        "required_inputs": {
+            "ForEachLoop": {"kind": "control_flow", "name": "ForEachLoop"},
+            "node_inputs": {
+                "kind": "*",
+                "name": "node_inputs",
+            },
+        }
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "*",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        current_node_id = self._node.node_id
+        node_inputs_value = get_input_value(
+            node_inputs, "required_inputs", "node_inputs"
+        )
+
+        graph = self._memory.get("graph")
+        graph_nodes = self._memory.get("graph_nodes")
+        evaluation_override_actions = self._memory.get("evaluation_override_actions")
+        node_id_of_loop_node = find_connected_loop_node(
+            graph, current_node_id, "ForEachLoop"
+        )
+        node_id_of_end_loop_node = find_loop_end_node(
+            graph, node_id_of_loop_node, "EndForEachLoop"
+        )
+
+        index_of_node_id = graph_nodes.index(current_node_id)
+        if index_of_node_id < len(graph_nodes) - 1:
+            next_node_id_topological = graph_nodes[index_of_node_id + 1]
+            next_action_topological = make_goto_action(
+                current_node_id if self._memory.get("parallel") else next_node_id_topological,
+                node_id_of_end_loop_node,
+            )
+            override_node_id = (
+                current_node_id
+                if self._memory.get("parallel")
+                else next_node_id_topological
+            )
+            evaluation_override_actions[override_node_id] = next_action_topological
+        else:
+            evaluation_override_actions[current_node_id] = make_goto_action(
+                current_node_id, node_id_of_end_loop_node
+            )
+
+        self._memory.get("_foreach_loop_state", {}).pop(node_id_of_loop_node, None)
+        return node_inputs_value
+
+
+class ContinueForEachLoop:
+    CATEGORY = "utilities"
+    SUBCATEGORY = "iteration"
+    DESCRIPTION = "Continues ForEachLoops"
+
+    INPUT = {
+        "required_inputs": {
+            "ForEachLoop": {"kind": "control_flow", "name": "ForEachLoop"},
+            "node_inputs": {
+                "kind": "*",
+                "name": "node_inputs",
+            },
+        }
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "*",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        current_node_id = self._node.node_id
+        node_inputs_value = get_input_value(
+            node_inputs, "required_inputs", "node_inputs"
+        )
+
+        graph = self._memory.get("graph")
+        graph_nodes = self._memory.get("graph_nodes")
+        evaluation_override_actions = self._memory.get("evaluation_override_actions")
+        node_id_of_loop_node = find_connected_loop_node(
+            graph, current_node_id, "ForEachLoop"
+        )
+
+        index_of_node_id = graph_nodes.index(current_node_id)
+        if index_of_node_id < len(graph_nodes) - 1:
+            next_node_id_topological = graph_nodes[index_of_node_id + 1]
+            next_action_topological = make_goto_action(
+                current_node_id if self._memory.get("parallel") else next_node_id_topological,
+                node_id_of_loop_node,
+            )
+            override_node_id = (
+                current_node_id
+                if self._memory.get("parallel")
+                else node_id_of_loop_node
+            )
+            evaluation_override_actions[override_node_id] = next_action_topological
+        else:
+            evaluation_override_actions[current_node_id] = make_goto_action(
+                current_node_id, node_id_of_loop_node
+            )
+
+        return node_inputs_value
 
 
 class ValuePath:
@@ -22830,6 +23411,46 @@ EXTENSION_MAPPINGS = {
             "python_class": EndWhileLoop,
             "javascript_class_name": "EndWhileLoop",
             "display_name": "EndWhileLoop",
+        },
+        "ForLoop": {
+            "python_class": ForLoop,
+            "javascript_class_name": "ForLoop",
+            "display_name": "ForLoop",
+        },
+        "EndForLoop": {
+            "python_class": EndForLoop,
+            "javascript_class_name": "EndForLoop",
+            "display_name": "EndForLoop",
+        },
+        "BreakForLoop": {
+            "python_class": BreakForLoop,
+            "javascript_class_name": "BreakForLoop",
+            "display_name": "BreakForLoop",
+        },
+        "ContinueForLoop": {
+            "python_class": ContinueForLoop,
+            "javascript_class_name": "ContinueForLoop",
+            "display_name": "ContinueForLoop",
+        },
+        "ForEachLoop": {
+            "python_class": ForEachLoop,
+            "javascript_class_name": "ForEachLoop",
+            "display_name": "ForEachLoop",
+        },
+        "EndForEachLoop": {
+            "python_class": EndForEachLoop,
+            "javascript_class_name": "EndForEachLoop",
+            "display_name": "EndForEachLoop",
+        },
+        "BreakForEachLoop": {
+            "python_class": BreakForEachLoop,
+            "javascript_class_name": "BreakForEachLoop",
+            "display_name": "BreakForEachLoop",
+        },
+        "ContinueForEachLoop": {
+            "python_class": ContinueForEachLoop,
+            "javascript_class_name": "ContinueForEachLoop",
+            "display_name": "ContinueForEachLoop",
         },
         "ValuePath": {
             "python_class": ValuePath,
