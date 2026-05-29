@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import sys
 from aiohttp import web
 
 from ...domain.utilities.verify_google_token import verify_google_token
@@ -9,6 +11,27 @@ from ...domain.utilities.fallback_json_encoder import dumps
 
 def base_routes(server):
     routes = server.routes
+
+    async def restart_server_process():
+        await asyncio.sleep(0.25)
+        server.logger.info("Restarting server process")
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    @routes.post("/server/restart")
+    async def restart_server(request):
+        info = authorize_user_and_get_info(request)
+
+        if isinstance(info, web.Response):
+            return info
+
+        user_info = info.get("user_info", {})
+
+        user_id = user_info.get("user_id")
+        if not user_id:
+            return web.json_response({"error": "No user id"}, status=401)
+
+        asyncio.create_task(restart_server_process())
+        return web.json_response({"status": "restarting", "reload_after_ms": 3000})
 
     @routes.post("/interventions/stop-points")
     async def toggle_stop_points(request):

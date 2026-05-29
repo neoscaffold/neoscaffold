@@ -370,6 +370,31 @@
       }
     },
 
+    async postRestartServer() {
+      const authorizationHeaders = await this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+
+      let results;
+      try {
+        results = await fetch(`${this.baseURL}/server/restart`, {
+          method: 'POST',
+          headers: authorizationHeaders
+        });
+        return this.parseJsonResponse(results);
+      } catch (error) {
+        if (
+          error.message &&
+          (error.message.toLowerCase().includes('401') ||
+            error.message.toLowerCase().includes('token expired') ||
+            error.message.toLowerCase().includes('unauthorized'))
+        ) {
+          global.NeoScaffold.applicationSession.invalidate();
+          global.NeoScaffold.applicationRouter.transitionTo('sign-in');
+        }
+        throw error;
+      }
+    },
+
     async initializeWebSocket() {
       const scope = this;
 
@@ -2611,6 +2636,18 @@
       await NeoScaffold.api.postToggleRestart(workflowSnapshot.checksum, nodeIds, allRestart);
     },
 
+    async restartServer() {
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+
+      try {
+        await NeoScaffold.api.postRestartServer();
+      } catch (error) {
+        console.error('Failed to restart server:', error);
+      }
+    },
+
     /**
      * Adds keyboard shortcuts to the canvas
      * @param {LiteGraphCanvas} canvas
@@ -2773,11 +2810,13 @@
     },
 
     /**
-     * Creates a 4 button toolbar which is fixed 50px from the bottom of the screen which contains the following buttons:
+     * Creates a runtime toolbar fixed near the bottom of the screen with controls for:
      * - Play
+     * - Execution mode
      * - Pause
      * - Stop
      * - Restart
+     * - Restart server
      * @param {LiteGraphCanvas} canvas
      */
     addRuntimeButtons(canvas) {
@@ -2794,6 +2833,7 @@
       const buttons = [
         {
           content: '▶️',
+          title: 'Run the current workflow. If paused, resume from the current breakpoint.',
           async callback() {
             // if paused, resume
             if (NeoScaffold['isPaused']) {
@@ -2805,32 +2845,47 @@
         },
         {
           content: 'SEQ',
+          title: 'Switch execution mode between sequential and parallel.',
           callback(event) {
             const nextMode = NeoScaffold.toggleExecutionMode();
             event.target.innerText = nextMode === 'parallel' ? 'PAR' : 'SEQ';
-            event.target.title = `Execution mode: ${nextMode}`;
+            event.target.title = `Execution mode: ${nextMode}. Click to switch execution mode.`;
+            event.target.setAttribute('aria-label', event.target.title);
           }
         },
         {
           content: '⏸️',
+          title: 'Pause execution at the next node by setting a global breakpoint.',
           callback: () => NeoScaffold.toggleBreakpoints(canvas, true)
         },
         {
           content: '⏹️',
+          title: 'Stop execution at the next node.',
           callback: () => NeoScaffold.toggleStopPoints(canvas, true)
         },
         {
           content: '🔄',
+          title: 'Restart workflow execution from the beginning.',
           callback: () => NeoScaffold.toggleRestartPoints(canvas, true)
+        },
+        {
+          content: '♻️',
+          title: 'Restart the Python server, then refresh this window after 3 seconds.',
+          callback: () => NeoScaffold.restartServer()
         },
       ];
 
       buttons.forEach((button) => {
         const buttonElement = document.createElement('button');
         buttonElement.innerText = button.content;
+        if (button.title) {
+          buttonElement.title = button.title;
+          buttonElement.setAttribute('aria-label', button.title);
+        }
         if (button.content === 'SEQ') {
           buttonElement.innerText = NeoScaffold.executionMode === 'parallel' ? 'PAR' : 'SEQ';
-          buttonElement.title = `Execution mode: ${NeoScaffold.executionMode}`;
+          buttonElement.title = `Execution mode: ${NeoScaffold.executionMode}. Click to switch execution mode.`;
+          buttonElement.setAttribute('aria-label', buttonElement.title);
         }
         buttonElement.style.margin = '0 5px';
         buttonElement.style.padding = '10px';
@@ -2911,9 +2966,11 @@
       menuContent.style.paddingTop = '24px';
       menuContent.classList.add('neoscaffold-side-menu-content');
 
-      const createSideMenuButton = function(label, callback) {
+      const createSideMenuButton = function(label, title, callback) {
         const button = document.createElement('button');
         button.innerText = label;
+        button.title = title;
+        button.setAttribute('aria-label', title);
         button.style.display = 'block';
         button.style.width = '100%';
         button.style.padding = '8px 15px';
@@ -2939,6 +2996,7 @@
       const collapseButton = document.createElement('button');
       collapseButton.innerText = '›';
       collapseButton.title = 'Collapse Menu';
+      collapseButton.setAttribute('aria-label', 'Collapse Menu');
       collapseButton.style.position = 'absolute';
       collapseButton.style.top = '6px';
       collapseButton.style.right = '6px';
@@ -2966,6 +3024,7 @@
         menuContent.style.display = isCollapsed ? 'block' : 'none';
         collapseButton.innerText = isCollapsed ? '›' : '‹';
         collapseButton.title = isCollapsed ? 'Collapse Menu' : 'Expand Menu';
+        collapseButton.setAttribute('aria-label', collapseButton.title);
         this.updateSideMenuPosition(canvas);
       });
       sideMenu.appendChild(collapseButton);
@@ -2974,14 +3033,17 @@
       const menuItems = [
         {
           label: 'Queue',
+          title: 'Run the current workflow.',
           callback: () => NeoScaffold.queuePrompt(1)
         },
         {
           label: 'Export',
+          title: 'Export the current workflow to a file.',
           callback: () => NeoScaffold.exportWorkflowWithSaveDialog()
         },
         {
           label: 'Import',
+          title: 'Import a workflow file from your computer.',
           callback: () => document.getElementById('workflow-input').click()
         },
         {
@@ -2990,28 +3052,33 @@
         },
         {
           label: 'Toggle Breakpoints',
+          title: 'Toggle breakpoint markers on the selected nodes.',
           callback: () => NeoScaffold.toggleBreakpoints(canvas)
         },
         {
           label: 'Step Through Breakpoints',
+          title: 'Resume paused execution through the selected breakpoint nodes.',
           callback: () => NeoScaffold.stepThroughBreakpoints(canvas)
         },
         {
           label: 'Toggle Stop Points',
+          title: 'Toggle stop markers on the selected nodes.',
           callback: () => NeoScaffold.toggleStopPoints(canvas)
         },
         {
           label: 'Toggle Restart Points',
+          title: 'Toggle restart markers on the selected nodes.',
           callback: () => NeoScaffold.toggleRestartPoints(canvas)
         },
         {
           label: 'Clear',
+          title: 'Clear the current canvas.',
           callback: () => NeoScaffold.clean()
         }
       ];
 
       menuItems.forEach(item => {
-        const button = createSideMenuButton(item.label, item.callback);
+        const button = createSideMenuButton(item.label, item.title, item.callback);
         menuContent.appendChild(button);
       });
       sideMenu.appendChild(menuContent);
