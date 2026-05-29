@@ -991,6 +991,7 @@
       scope.addExtraMenuOptions(canvas);
       scope.addSideMenuOptions(canvas);
       scope.addRuntimeButtons(canvas);
+      scope.addZoomControls(canvas);
       scope.enableMultiNodeDragging(canvas);
       scope.addKeyboardShortcuts(canvas);
 
@@ -1956,6 +1957,7 @@
 
       this.updateToolbarPosition(canvas);
       this.updateSideMenuPosition(canvas);
+      this.updateZoomControlsPosition(canvas);
 
       this.graph.change();
     },
@@ -3053,8 +3055,62 @@
       return toolbar;
     },
 
+    zoomCanvas(canvas, zoomMultiplier) {
+      if (!canvas || !canvas.setZoom || !canvas.ds) {
+        return;
+      }
+
+      const nextZoom = zoomMultiplier ? canvas.ds.scale * zoomMultiplier : 1;
+      canvas.setZoom(nextZoom);
+      canvas.setDirty(true, true);
+    },
+
+    addZoomControls(canvas) {
+      const zoomControls = document.createElement('div');
+      zoomControls.style.position = 'absolute';
+      zoomControls.style.zIndex = '1000';
+      zoomControls.style.display = 'flex';
+      zoomControls.style.gap = '6px';
+      zoomControls.style.alignItems = 'center';
+      zoomControls.classList.add('neoscaffold-zoom-controls');
+
+      const buttons = [
+        {
+          content: '+',
+          title: 'Zoom in',
+          callback: () => NeoScaffold.zoomCanvas(canvas, 1.1)
+        },
+        {
+          content: '-',
+          title: 'Zoom out',
+          callback: () => NeoScaffold.zoomCanvas(canvas, 1 / 1.1)
+        },
+        {
+          content: '100%',
+          title: 'Reset zoom to 100%',
+          callback: () => NeoScaffold.zoomCanvas(canvas)
+        },
+      ];
+
+      buttons.forEach((button) => {
+        const buttonElement = document.createElement('button');
+        buttonElement.innerText = button.content;
+        buttonElement.title = button.title;
+        buttonElement.setAttribute('aria-label', button.title);
+        NeoScaffold.setRuntimeButtonBaseStyle(buttonElement);
+        buttonElement.style.minWidth = button.content === '100%' ? '52px' : '36px';
+        buttonElement.addEventListener('click', button.callback);
+        zoomControls.appendChild(buttonElement);
+      });
+
+      canvas.canvas.parentElement.appendChild(zoomControls);
+      this.updateZoomControlsPosition(canvas);
+
+      return zoomControls;
+    },
+
     /**
-     * Updates the position of the toolbar and side menu
+     * Updates the position of the runtime toolbar
      * @param {LiteGraphCanvas} canvas
      */
     updateToolbarPosition(canvas) {
@@ -3069,6 +3125,17 @@
         const centerY = canvasContainer.clientHeight - toolbarRect.height;
         toolbar.style.left = `${centerX}px`;
         toolbar.style.top = `${centerY}px`;
+      }
+    },
+
+    updateZoomControlsPosition(canvas) {
+      const zoomControlElements = document.getElementsByClassName('neoscaffold-zoom-controls');
+      const canvasContainer = canvas.canvas.parentElement;
+
+      for (const zoomControls of zoomControlElements) {
+        const zoomControlsRect = zoomControls.getBoundingClientRect();
+        zoomControls.style.left = `${canvasContainer.clientWidth - zoomControlsRect.width - 12}px`;
+        zoomControls.style.top = `${canvasContainer.clientHeight - zoomControlsRect.height - 12}px`;
       }
     },
 
