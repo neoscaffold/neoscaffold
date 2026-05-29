@@ -370,6 +370,31 @@
       }
     },
 
+    async postRestartServer() {
+      const authorizationHeaders = await this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+
+      let results;
+      try {
+        results = await fetch(`${this.baseURL}/server/restart`, {
+          method: 'POST',
+          headers: authorizationHeaders
+        });
+        return this.parseJsonResponse(results);
+      } catch (error) {
+        if (
+          error.message &&
+          (error.message.toLowerCase().includes('401') ||
+            error.message.toLowerCase().includes('token expired') ||
+            error.message.toLowerCase().includes('unauthorized'))
+        ) {
+          global.NeoScaffold.applicationSession.invalidate();
+          global.NeoScaffold.applicationRouter.transitionTo('sign-in');
+        }
+        throw error;
+      }
+    },
+
     async initializeWebSocket() {
       const scope = this;
 
@@ -2331,6 +2356,18 @@
       await NeoScaffold.api.postToggleRestart(workflowSnapshot.checksum, nodeIds, allRestart);
     },
 
+    async restartServer() {
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+
+      try {
+        await NeoScaffold.api.postRestartServer();
+      } catch (error) {
+        console.error('Failed to restart server:', error);
+      }
+    },
+
     /**
      * Adds keyboard shortcuts to the canvas
      * @param {LiteGraphCanvas} canvas
@@ -2493,11 +2530,13 @@
     },
 
     /**
-     * Creates a 4 button toolbar which is fixed 50px from the bottom of the screen which contains the following buttons:
+     * Creates a runtime toolbar fixed near the bottom of the screen with controls for:
      * - Play
+     * - Execution mode
      * - Pause
      * - Stop
      * - Restart
+     * - Restart server
      * @param {LiteGraphCanvas} canvas
      */
     addRuntimeButtons(canvas) {
@@ -2543,11 +2582,19 @@
           content: '🔄',
           callback: () => NeoScaffold.toggleRestartPoints(canvas, true)
         },
+        {
+          content: '♻️',
+          title: 'Restart Python server',
+          callback: () => NeoScaffold.restartServer()
+        },
       ];
 
       buttons.forEach((button) => {
         const buttonElement = document.createElement('button');
         buttonElement.innerText = button.content;
+        if (button.title) {
+          buttonElement.title = button.title;
+        }
         if (button.content === 'SEQ') {
           buttonElement.innerText = NeoScaffold.executionMode === 'parallel' ? 'PAR' : 'SEQ';
           buttonElement.title = `Execution mode: ${NeoScaffold.executionMode}`;
