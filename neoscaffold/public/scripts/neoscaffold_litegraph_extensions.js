@@ -520,6 +520,7 @@
     processingQueue: false,
 
     executionMode: 'sequential',
+    cameraFollowRunningNode: false,
     executionState: {
       mode: 'sequential',
       activePromptIds: {},
@@ -622,12 +623,138 @@
       }
       this.executionMode = mode;
       this.executionState.mode = mode;
+      if (mode !== 'sequential') {
+        this.cameraFollowRunningNode = false;
+      }
+      this.updateRuntimeButtons();
       return this.executionMode;
     },
 
     toggleExecutionMode() {
       const nextMode = this.executionMode === 'parallel' ? 'sequential' : 'parallel';
       return this.setExecutionMode(nextMode);
+    },
+
+    isCameraFollowAvailable() {
+      return this.executionMode === 'sequential';
+    },
+
+    toggleCameraFollowRunningNode(canvas) {
+      if (!this.isCameraFollowAvailable()) {
+        alert('Camera follow is only available in sequential execution mode.');
+        return this.cameraFollowRunningNode;
+      }
+
+      this.cameraFollowRunningNode = !this.cameraFollowRunningNode;
+      this.updateRuntimeButtons();
+
+      if (this.cameraFollowRunningNode) {
+        this.centerCameraOnRunningNode(null, canvas);
+      }
+
+      return this.cameraFollowRunningNode;
+    },
+
+    getRunningExecutionNode() {
+      if (!this.graph || !this.executionState || !this.executionState.nodesByPrompt) {
+        return null;
+      }
+
+      const promptIds = [];
+      if (this.activePromptId) {
+        promptIds.push(this.activePromptId);
+      }
+      Object.keys(this.executionState.nodesByPrompt).forEach((promptId) => {
+        if (!promptIds.includes(promptId)) {
+          promptIds.push(promptId);
+        }
+      });
+
+      for (const promptId of promptIds) {
+        const promptState = this.executionState.nodesByPrompt[promptId];
+        if (!promptState) {
+          continue;
+        }
+
+        const runningNodeId = Object.keys(promptState).find((nodeId) => {
+          return promptState[nodeId] && promptState[nodeId].status === 'running';
+        });
+        if (runningNodeId) {
+          return this.graph.getNodeById(runningNodeId);
+        }
+      }
+
+      return null;
+    },
+
+    centerCameraOnRunningNode(node, canvas) {
+      if (!this.cameraFollowRunningNode || !this.isCameraFollowAvailable()) {
+        return;
+      }
+
+      const targetNode = node || this.getRunningExecutionNode();
+      const targetCanvas = canvas || this.litegraphCanvas;
+      if (targetNode && targetCanvas && targetCanvas.centerOnNode) {
+        targetCanvas.centerOnNode(targetNode);
+      }
+    },
+
+    takeMeToCurrentNode(canvas) {
+      const targetNode = this.getRunningExecutionNode();
+      const targetCanvas = canvas || this.litegraphCanvas;
+      if (targetNode && targetCanvas && targetCanvas.centerOnNode) {
+        targetCanvas.centerOnNode(targetNode);
+        return targetNode;
+      }
+
+      alert('No node is currently running.');
+      return null;
+    },
+
+    setRuntimeButtonBaseStyle(buttonElement) {
+      buttonElement.style.margin = '0 5px';
+      buttonElement.style.padding = '10px';
+      buttonElement.style.borderRadius = '5px';
+      buttonElement.style.border = 'none';
+      buttonElement.style.backgroundColor = '#3c3c3c';
+      buttonElement.style.color = '#fff';
+      buttonElement.style.cursor = 'pointer';
+    },
+
+    updateRuntimeButtonStyle(buttonElement, isActive, isDisabled) {
+      if (!buttonElement) {
+        return;
+      }
+
+      buttonElement.disabled = Boolean(isDisabled);
+      buttonElement.style.backgroundColor = isActive ? '#4f8cff' : '#3c3c3c';
+      buttonElement.style.color = isDisabled ? '#999' : '#fff';
+      buttonElement.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
+      buttonElement.style.opacity = isDisabled ? '0.6' : '1';
+    },
+
+    updateRuntimeButtons() {
+      if (typeof document === 'undefined') {
+        return;
+      }
+
+      const modeButtons = document.querySelectorAll('[data-neoscaffold-runtime-button="execution-mode"]');
+      modeButtons.forEach((buttonElement) => {
+        buttonElement.innerText = this.executionMode === 'parallel' ? 'PAR' : 'SEQ';
+        buttonElement.title = `Execution mode: ${this.executionMode}`;
+      });
+
+      const cameraFollowButtons = document.querySelectorAll('[data-neoscaffold-runtime-button="camera-follow"]');
+      cameraFollowButtons.forEach((buttonElement) => {
+        buttonElement.title = this.isCameraFollowAvailable()
+          ? 'Camera follow running node'
+          : 'Camera follow is only available in sequential mode';
+        this.updateRuntimeButtonStyle(
+          buttonElement,
+          this.cameraFollowRunningNode,
+          !this.isCameraFollowAvailable()
+        );
+      });
     },
 
     ensureExecutionPromptState(promptId) {
@@ -732,6 +859,7 @@
         this.executionColors.running || LiteGraph.NODE_BOX_OUTLINE_COLOR,
         LiteGraph.NODE_BOX_OUTLINE_COLOR
       );
+      this.centerCameraOnRunningNode(node);
 
       if (!state.willExecuteCalled && node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('willExecute') && node.hooks.willExecute.length) {
         node.hooks.willExecute.forEach((hook) => {
@@ -2773,8 +2901,11 @@
     },
 
     /**
-     * Creates a 4 button toolbar which is fixed 50px from the bottom of the screen which contains the following buttons:
+     * Creates a runtime toolbar fixed 50px from the bottom of the screen which contains the following buttons:
      * - Play
+     * - Execution mode
+     * - Camera follow
+     * - Take me to current node
      * - Pause
      * - Stop
      * - Restart
@@ -2812,6 +2943,20 @@
           }
         },
         {
+          content: 'CAM',
+          buttonType: 'camera-follow',
+          callback() {
+            NeoScaffold.toggleCameraFollowRunningNode(canvas);
+          }
+        },
+        {
+          content: 'CUR',
+          title: 'Take me to current running node',
+          callback() {
+            NeoScaffold.takeMeToCurrentNode(canvas);
+          }
+        },
+        {
           content: '⏸️',
           callback: () => NeoScaffold.toggleBreakpoints(canvas, true)
         },
@@ -2829,22 +2974,24 @@
         const buttonElement = document.createElement('button');
         buttonElement.innerText = button.content;
         if (button.content === 'SEQ') {
+          buttonElement.dataset.neoscaffoldRuntimeButton = 'execution-mode';
           buttonElement.innerText = NeoScaffold.executionMode === 'parallel' ? 'PAR' : 'SEQ';
           buttonElement.title = `Execution mode: ${NeoScaffold.executionMode}`;
         }
-        buttonElement.style.margin = '0 5px';
-        buttonElement.style.padding = '10px';
-        buttonElement.style.borderRadius = '5px';
-        buttonElement.style.border = 'none';
-        buttonElement.style.backgroundColor = '#3c3c3c';
-        buttonElement.style.color = '#fff';
-        buttonElement.style.cursor = 'pointer';
+        if (button.buttonType === 'camera-follow') {
+          buttonElement.dataset.neoscaffoldRuntimeButton = 'camera-follow';
+        }
+        if (button.title) {
+          buttonElement.title = button.title;
+        }
+        NeoScaffold.setRuntimeButtonBaseStyle(buttonElement);
         buttonElement.addEventListener('click', button.callback);
         toolbar.appendChild(buttonElement);
       });
 
       // Add the toolbar to the canvas container
       canvas.canvas.parentElement.appendChild(toolbar);
+      NeoScaffold.updateRuntimeButtons();
 
       // Update position initially and on canvas resize
       this.updateToolbarPosition(canvas);
