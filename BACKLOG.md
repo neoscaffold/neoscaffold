@@ -1,14 +1,7 @@
 ## Backlog for Neoscaffold:
 -History (to make easy to roll-back to previous version)
--Import wf into another wf
 -Pin group to canvas (option in submenu)
--Kill server/ restart server
 -Live reload
--For loop
--ForEach loop
--Camera follow mode: Camera center on running node (while running)
--Take me to current node (while running)
--Side menu (make it moveable on canvas)
 -Input editor: make expandable
 -Enable rectangular wires mode from litegraph
 -If a value isn't being used in a node because the link supplies the value it should be grayed out or denoted as such
