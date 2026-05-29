@@ -546,6 +546,7 @@
 
     executionMode: 'sequential',
     cameraFollowRunningNode: false,
+    runningProgressTimer: null,
     executionState: {
       mode: 'sequential',
       activePromptIds: {},
@@ -640,6 +641,86 @@
         day: '2-digit',
         year: '2-digit',
       });
+    },
+
+    parseExecutionTimestamp(timestamp) {
+      if (!timestamp) {
+        return null;
+      }
+
+      const parsed = Date.parse(timestamp);
+      return Number.isNaN(parsed) ? null : parsed;
+    },
+
+    getExecutionDurationMs(startedAt, completedAt) {
+      const startedAtMs = this.parseExecutionTimestamp(startedAt);
+      const completedAtMs = this.parseExecutionTimestamp(completedAt);
+      if (!startedAtMs || !completedAtMs || completedAtMs <= startedAtMs) {
+        return null;
+      }
+      return completedAtMs - startedAtMs;
+    },
+
+    getPreviousExecutionDurationMs(node) {
+      if (!node || !node.properties) {
+        return null;
+      }
+
+      const previousResult = node.properties.result || {};
+      return this.getExecutionDurationMs(
+        previousResult.started_at || node.properties.started_at,
+        previousResult.completed_at || node.properties.completed_at
+      );
+    },
+
+    formatElapsedTime(elapsedMs) {
+      const safeElapsedMs = Math.max(0, elapsedMs || 0);
+      if (safeElapsedMs < 1000) {
+        return `${safeElapsedMs}ms`;
+      }
+
+      const totalSeconds = Math.floor(safeElapsedMs / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+      }
+
+      return `${seconds}s`;
+    },
+
+    hasRunningExecutionNodes() {
+      if (!this.executionState || !this.executionState.nodesByPrompt) {
+        return false;
+      }
+
+      return Object.keys(this.executionState.nodesByPrompt).some((promptId) => {
+        const promptState = this.executionState.nodesByPrompt[promptId];
+        return Object.keys(promptState || {}).some((nodeId) => {
+          return promptState[nodeId] && promptState[nodeId].status === 'running';
+        });
+      });
+    },
+
+    updateRunningProgressTimer() {
+      const hasRunningNodes = this.hasRunningExecutionNodes();
+      if (hasRunningNodes && !this.runningProgressTimer) {
+        this.runningProgressTimer = setInterval(() => {
+          if (!this.hasRunningExecutionNodes()) {
+            this.updateRunningProgressTimer();
+            return;
+          }
+          if (this.graph) {
+            this.graph.setDirtyCanvas(true, true);
+          }
+        }, 500);
+        return;
+      }
+
+      if (!hasRunningNodes && this.runningProgressTimer) {
+        clearInterval(this.runningProgressTimer);
+        this.runningProgressTimer = null;
+      }
     },
 
     setExecutionMode(mode) {
@@ -820,6 +901,7 @@
           }
         });
       }
+      this.updateRunningProgressTimer();
 
       return this.executionState.nodesByPrompt[safePromptId];
     },
@@ -828,6 +910,7 @@
       if (!node || !node.properties) {
         return;
       }
+      const previousExecutionDurationMs = this.getPreviousExecutionDurationMs(node);
       const state = this.getExecutionNodeState(promptId, String(node.id));
       state.status = 'queued';
       state.startedAt = null;
@@ -840,6 +923,11 @@
       node.properties.execution_prompt_id = promptId;
       delete node.properties.node_errors;
       delete node.properties.result;
+      delete node.properties.started_at;
+      delete node.properties.completed_at;
+      if (previousExecutionDurationMs) {
+        node.properties.last_execution_duration_ms = previousExecutionDurationMs;
+      }
       node.restoreColors && node.restoreColors();
     },
 
@@ -885,6 +973,7 @@
         LiteGraph.NODE_BOX_OUTLINE_COLOR
       );
       this.centerCameraOnRunningNode(node);
+      this.updateRunningProgressTimer();
 
       if (!state.willExecuteCalled && node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('willExecute') && node.hooks.willExecute.length) {
         node.hooks.willExecute.forEach((hook) => {
@@ -901,6 +990,10 @@
       const state = this.getExecutionNodeState(promptId, String(node.id));
       state.status = 'completed';
       state.completedAt = state.completedAt || this.formatExecutionTimestamp();
+      const executionDurationMs = this.getExecutionDurationMs(
+        state.startedAt,
+        state.completedAt
+      );
 
       const resultObject = {
         prompt_id: promptId,
@@ -915,6 +1008,9 @@
       node.properties.execution_mode = this.executionMode;
       node.properties.execution_prompt_id = promptId;
       node.properties.completed_at = state.completedAt;
+      if (executionDurationMs) {
+        node.properties.last_execution_duration_ms = executionDurationMs;
+      }
 
       if (node.properties.node_errors) {
         delete node.properties.node_errors;
@@ -928,6 +1024,7 @@
       state.didExecuteCalled = true;
 
       node.restoreColors && node.restoreColors();
+      this.updateRunningProgressTimer();
     },
 
     markNodeFailed(promptId, node, nodeErrors) {
@@ -944,6 +1041,7 @@
       node.properties.completed_at = state.completedAt;
       node.properties.node_errors = nodeErrors;
       node.storeAndSwitchColors(this.executionColors.failed, this.executionColors.failed);
+      this.updateRunningProgressTimer();
     },
 
     markNodePaused(promptId, node) {
@@ -956,6 +1054,7 @@
       node.properties.execution_mode = this.executionMode;
       node.properties.execution_prompt_id = promptId;
       node.storeAndSwitchColors(this.executionColors.paused, this.executionColors.paused);
+      this.updateRunningProgressTimer();
     },
 
     markRemainingNodesCancelled(promptId) {
@@ -975,6 +1074,7 @@
           }
         }
       });
+      this.updateRunningProgressTimer();
     },
 
     async createGraph(canvasSelector, baseURL, sessionKey) {
@@ -1518,6 +1618,7 @@
           // results widget section
           scope.addNodeStatusWidget(this);
           scope.addColorMethods(this);
+          scope.addRunningProgressMethods(this);
         },
         staticProps
       );
@@ -1655,6 +1756,85 @@
           node.color = color;
           node.bgcolor = bgColor;
         }
+      };
+    },
+
+    addRunningProgressMethods(node) {
+      if (node._neoRunningProgressWrapped) {
+        return;
+      }
+      node._neoRunningProgressWrapped = true;
+
+      const scope = this;
+      const originalOnDrawForeground = node.onDrawForeground;
+
+      node.drawRunningProgress = function(ctx) {
+        if (
+          !node.properties ||
+          node.properties.execution_status !== 'running' ||
+          (node.flags && node.flags.collapsed)
+        ) {
+          return;
+        }
+
+        const startedAtMs = scope.parseExecutionTimestamp(node.properties.started_at);
+        if (!startedAtMs) {
+          return;
+        }
+
+        const elapsedMs = Date.now() - startedAtMs;
+        const expectedDurationMs = node.properties.last_execution_duration_ms;
+        const hasEstimate = Number.isFinite(expectedDurationMs) && expectedDurationMs > 0;
+        const progress = hasEstimate
+          ? Math.min(0.99, Math.max(0.01, elapsedMs / expectedDurationMs))
+          : 0;
+        const percentLabel = hasEstimate ? `${Math.round(progress * 100)}%` : '--%';
+        const elapsedLabel = scope.formatElapsedTime(elapsedMs);
+
+        const margin = 10;
+        const barHeight = 16;
+        const barWidth = Math.max(80, node.size[0] - (margin * 2));
+        const x = margin;
+        const y = 6;
+        const radius = 7;
+
+        ctx.save();
+        ctx.globalAlpha = 0.95;
+        ctx.fillStyle = 'rgba(20, 24, 31, 0.88)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, barWidth, barHeight, [radius]);
+        ctx.fill();
+
+        if (hasEstimate) {
+          ctx.fillStyle = scope.executionColors.running || '#4f8cff';
+          ctx.beginPath();
+          ctx.roundRect(x, y, barWidth * progress, barHeight, [radius]);
+          ctx.fill();
+        }
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, barWidth, barHeight, [radius]);
+        ctx.stroke();
+
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px "PP Mori SemiBold", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(
+          `${percentLabel} - ${elapsedLabel}`,
+          x + (barWidth / 2),
+          y + (barHeight / 2)
+        );
+        ctx.restore();
+      };
+
+      node.onDrawForeground = function(ctx, graphCanvas, canvas) {
+        if (originalOnDrawForeground) {
+          originalOnDrawForeground.call(this, ctx, graphCanvas, canvas);
+        }
+        this.drawRunningProgress(ctx);
       };
     },
 
@@ -2138,6 +2318,10 @@
 
     clean() {
       let scope = this;
+      if (this.runningProgressTimer) {
+        clearInterval(this.runningProgressTimer);
+        this.runningProgressTimer = null;
+      }
       // run willDestroy for each node
       this.graph._nodes.forEach((node) => {
         if (node.hasOwnProperty('hooks') && node.hooks.hasOwnProperty('willDestroy') && node.hooks.willDestroy.length) {
@@ -2153,6 +2337,10 @@
       // Remove all listeners
       window.removeEventListener('resize', this._resizeHandler);
       window.removeEventListener('mouseup', this._mouseupHandler);
+      if (this.runningProgressTimer) {
+        clearInterval(this.runningProgressTimer);
+        this.runningProgressTimer = null;
+      }
     },
 
     importGraph(event) {
@@ -2335,7 +2523,8 @@
         'execution_mode',
         'execution_prompt_id',
         'started_at',
-        'completed_at'
+        'completed_at',
+        'last_execution_duration_ms'
       ];
 
       // Drop runtime-only state so execution progress does not affect persistence or checksums.

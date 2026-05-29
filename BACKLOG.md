@@ -15,5 +15,3 @@ the text box should be better, specifically resizable and optionally centered on
 -Put back booleans.
 -Overlay that highlight certain things: e.g. variables.
 -Document and make static variables easier to indentify because they are time/ position irrelevent.
--Hashmaps/ Dict: specific operations (e.g. needed for video shot creation in parallel).
--add a progress spinner and elapsed time in a currently running node on the UI, read the "started_at" and "completed_at" from the previous output in the node to make a progress-bar with a % indicator
