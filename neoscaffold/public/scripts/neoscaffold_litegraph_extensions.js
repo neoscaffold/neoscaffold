@@ -3255,12 +3255,21 @@
     },
 
     addZoomControls(canvas) {
+      const canvasContainer = canvas.canvas.parentElement;
+      if (window.getComputedStyle(canvasContainer).position === 'static') {
+        canvasContainer.style.position = 'relative';
+      }
+
       const zoomControls = document.createElement('div');
       zoomControls.style.position = 'absolute';
       zoomControls.style.zIndex = '1000';
       zoomControls.style.display = 'flex';
       zoomControls.style.gap = '6px';
       zoomControls.style.alignItems = 'center';
+      zoomControls.style.right = '12px';
+      zoomControls.style.bottom = '12px';
+      zoomControls.style.left = 'auto';
+      zoomControls.style.top = 'auto';
       zoomControls.classList.add('neoscaffold-zoom-controls');
 
       const buttons = [
@@ -3292,7 +3301,7 @@
         zoomControls.appendChild(buttonElement);
       });
 
-      canvas.canvas.parentElement.appendChild(zoomControls);
+      canvasContainer.appendChild(zoomControls);
       this.updateZoomControlsPosition(canvas);
 
       return zoomControls;
@@ -3311,7 +3320,7 @@
       for (const toolbar of toolbars) {
         const toolbarRect = toolbar.getBoundingClientRect();
         const centerX = canvasContainer.clientWidth / 2 - toolbarRect.width / 2;
-        const centerY = canvasContainer.clientHeight - toolbarRect.height;
+        const centerY = canvasContainer.clientHeight - toolbarRect.height - 50;
         toolbar.style.left = `${centerX}px`;
         toolbar.style.top = `${centerY}px`;
       }
@@ -3319,12 +3328,12 @@
 
     updateZoomControlsPosition(canvas) {
       const zoomControlElements = document.getElementsByClassName('neoscaffold-zoom-controls');
-      const canvasContainer = canvas.canvas.parentElement;
 
       for (const zoomControls of zoomControlElements) {
-        const zoomControlsRect = zoomControls.getBoundingClientRect();
-        zoomControls.style.left = `${canvasContainer.clientWidth - zoomControlsRect.width - 12}px`;
-        zoomControls.style.top = `${canvasContainer.clientHeight - zoomControlsRect.height - 12}px`;
+        zoomControls.style.right = '12px';
+        zoomControls.style.bottom = '12px';
+        zoomControls.style.left = 'auto';
+        zoomControls.style.top = 'auto';
       }
     },
 
