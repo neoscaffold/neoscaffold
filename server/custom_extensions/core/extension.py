@@ -73,6 +73,24 @@ def normalize_hashmap(value, default=None):
     return dict(value)
 
 
+def normalize_array(value, default=None):
+    if value is None:
+        value = default if default is not None else []
+
+    if isinstance(value, str):
+        if not value:
+            return []
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return value.split(",")
+
+    if not isinstance(value, list):
+        raise TypeError("Array input must be an array")
+
+    return list(value)
+
+
 def validate_loop_connections(graph, graph_nodes, current_node_id, end_node_kind):
     connected_node_ids = list(graph.successors(current_node_id))
     end_loop_node_ids = [
@@ -664,13 +682,7 @@ class nsArray:
                     .get("initial_data")
                     .get("values", [])
                 )
-                # if self.data is a string parse it into an list
-                if isinstance(self.data, str):
-                    try:
-                        self.data = json.loads(self.data)
-                    except json.JSONDecodeError:
-                        # If JSON parsing fails, split the string into a list
-                        self.data = self.data.split(",")
+                self.data = normalize_array(self.data)
 
         return self.data
 
@@ -698,17 +710,9 @@ class nsArrayLength:
     }
 
     def evaluate(self, node_inputs):
-        array = []
-        if node_inputs.get("required_inputs"):
-            if "array" in node_inputs.get("required_inputs"):
-                array = node_inputs.get("required_inputs").get("array").get("values", [])
-
-        if isinstance(array, str):
-            try:
-                array = json.loads(array)
-            except json.JSONDecodeError:
-                array = array.split(",") if array else []
-
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
         return len(array)
 
 
@@ -739,15 +743,362 @@ class nsArrayAppend:
     }
 
     def evaluate(self, node_inputs):
-        if node_inputs.get("required_inputs"):
-            if "array" in node_inputs.get("required_inputs"):
-                self.array = node_inputs.get("required_inputs").get("array").get("values")
-            if "element" in node_inputs.get("required_inputs"):
-                self.element = node_inputs.get("required_inputs").get("element").get("values")
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
+        element = get_input_value(node_inputs, "required_inputs", "element")
+        array.append(element)
+        return array
 
-        self.array.append(self.element)
 
-        return self.array
+class nsArrayGet:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns the value at an array index."
+
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+            "index": {
+                "kind": "number",
+                "name": "index",
+                "widget": {
+                    "kind": "number",
+                    "name": "index",
+                    "default": 0,
+                    "step": 1,
+                    "precision": 0,
+                    "integer": True,
+                },
+            },
+        },
+        "optional_inputs": {
+            "default": {
+                "kind": "*",
+                "name": "default",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "value",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
+        index = int(get_input_value(node_inputs, "required_inputs", "index", 0))
+        default = get_input_value(node_inputs, "optional_inputs", "default")
+
+        try:
+            return array[index]
+        except IndexError:
+            return default
+
+
+class nsArraySet:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns an array with the value at an index replaced."
+
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+            "index": {
+                "kind": "number",
+                "name": "index",
+                "widget": {
+                    "kind": "number",
+                    "name": "index",
+                    "default": 0,
+                    "step": 1,
+                    "precision": 0,
+                    "integer": True,
+                },
+            },
+            "value": {
+                "kind": "*",
+                "name": "value",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "array",
+        "name": "array",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
+        index = int(get_input_value(node_inputs, "required_inputs", "index", 0))
+        value = get_input_value(node_inputs, "required_inputs", "value")
+        array[index] = value
+        return array
+
+
+class nsArrayInsert:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns an array with an element inserted at an index."
+
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+            "index": {
+                "kind": "number",
+                "name": "index",
+                "widget": {
+                    "kind": "number",
+                    "name": "index",
+                    "default": 0,
+                    "step": 1,
+                    "precision": 0,
+                    "integer": True,
+                },
+            },
+            "element": {
+                "kind": "*",
+                "name": "element",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "array",
+        "name": "array",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
+        index = int(get_input_value(node_inputs, "required_inputs", "index", 0))
+        element = get_input_value(node_inputs, "required_inputs", "element")
+        array.insert(index, element)
+        return array
+
+
+class nsArrayDelete:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns an array with the element at an index removed."
+
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+            "index": {
+                "kind": "number",
+                "name": "index",
+                "widget": {
+                    "kind": "number",
+                    "name": "index",
+                    "default": 0,
+                    "step": 1,
+                    "precision": 0,
+                    "integer": True,
+                },
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "array",
+        "name": "array",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
+        index = int(get_input_value(node_inputs, "required_inputs", "index", 0))
+        del array[index]
+        return array
+
+
+class nsArrayContains:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns whether an array contains the provided value."
+
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+            "value": {
+                "kind": "*",
+                "name": "value",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "boolean",
+        "name": "contains",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
+        value = get_input_value(node_inputs, "required_inputs", "value")
+        return value in array
+
+
+class nsArrayIndexOf:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns the first index of a value in an array, or -1 when absent."
+
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+            "value": {
+                "kind": "*",
+                "name": "value",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "integer",
+        "name": "index",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
+        value = get_input_value(node_inputs, "required_inputs", "value")
+        try:
+            return array.index(value)
+        except ValueError:
+            return -1
+
+
+class nsArraySlice:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns a slice of an array."
+
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+        },
+        "optional_inputs": {
+            "start": {
+                "kind": "number",
+                "name": "start",
+                "widget": {
+                    "kind": "number",
+                    "name": "start",
+                    "default": 0,
+                    "step": 1,
+                    "precision": 0,
+                    "integer": True,
+                },
+            },
+            "end": {
+                "kind": "number",
+                "name": "end",
+            },
+            "step": {
+                "kind": "number",
+                "name": "step",
+                "widget": {
+                    "kind": "number",
+                    "name": "step",
+                    "default": 1,
+                    "step": 1,
+                    "precision": 0,
+                    "integer": True,
+                },
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "array",
+        "name": "array",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
+        start = get_input_value(node_inputs, "optional_inputs", "start")
+        end = get_input_value(node_inputs, "optional_inputs", "end")
+        step = get_input_value(node_inputs, "optional_inputs", "step")
+
+        start = int(start) if start is not None else None
+        end = int(end) if end is not None else None
+        step = int(step) if step is not None else None
+
+        return array[slice(start, end, step)]
+
+
+class nsArrayConcat:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns two arrays concatenated together."
+
+    INPUT = {
+        "required_inputs": {
+            "array": {
+                "kind": "array",
+                "name": "array",
+            },
+            "other_array": {
+                "kind": "array",
+                "name": "other_array",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "array",
+        "name": "array",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "array")
+        )
+        other_array = normalize_array(
+            get_input_value(node_inputs, "required_inputs", "other_array")
+        )
+        return array + other_array
 
 class nsArrayAppendMemory:
     CATEGORY = "core"
@@ -23681,6 +24032,46 @@ EXTENSION_MAPPINGS = {
             "python_class": nsArrayAppend,
             "javascript_class_name": "nsArrayAppend",
             "display_name": "ArrayAppend",
+        },
+        "nsArrayGet": {
+            "python_class": nsArrayGet,
+            "javascript_class_name": "nsArrayGet",
+            "display_name": "ArrayGet",
+        },
+        "nsArraySet": {
+            "python_class": nsArraySet,
+            "javascript_class_name": "nsArraySet",
+            "display_name": "ArraySet",
+        },
+        "nsArrayInsert": {
+            "python_class": nsArrayInsert,
+            "javascript_class_name": "nsArrayInsert",
+            "display_name": "ArrayInsert",
+        },
+        "nsArrayDelete": {
+            "python_class": nsArrayDelete,
+            "javascript_class_name": "nsArrayDelete",
+            "display_name": "ArrayDelete",
+        },
+        "nsArrayContains": {
+            "python_class": nsArrayContains,
+            "javascript_class_name": "nsArrayContains",
+            "display_name": "ArrayContains",
+        },
+        "nsArrayIndexOf": {
+            "python_class": nsArrayIndexOf,
+            "javascript_class_name": "nsArrayIndexOf",
+            "display_name": "ArrayIndexOf",
+        },
+        "nsArraySlice": {
+            "python_class": nsArraySlice,
+            "javascript_class_name": "nsArraySlice",
+            "display_name": "ArraySlice",
+        },
+        "nsArrayConcat": {
+            "python_class": nsArrayConcat,
+            "javascript_class_name": "nsArrayConcat",
+            "display_name": "ArrayConcat",
         },
         "nsArrayAppendMemory": {
             "python_class": nsArrayAppendMemory,
