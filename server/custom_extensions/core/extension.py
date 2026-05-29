@@ -58,6 +58,21 @@ def get_input_value(node_inputs, input_group, input_name, default=None):
     )
 
 
+def normalize_hashmap(value, default=None):
+    if value is None:
+        value = default if default is not None else {}
+
+    if isinstance(value, str):
+        if not value:
+            return {}
+        value = json.loads(value)
+
+    if not isinstance(value, dict):
+        raise TypeError("HashMap input must be an object")
+
+    return dict(value)
+
+
 def validate_loop_connections(graph, graph_nodes, current_node_id, end_node_kind):
     connected_node_ids = list(graph.successors(current_node_id))
     end_loop_node_ids = [
@@ -351,8 +366,268 @@ class nsHashMap:
                     .get("initial_data")
                     .get("values", {})
                 )
+                self.data = normalize_hashmap(self.data)
 
         return self.data
+
+
+class nsHashMapInsert:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns a HashMap with a key set to the provided value."
+
+    INPUT = {
+        "required_inputs": {
+            "hashmap": {
+                "kind": "object",
+                "name": "hashmap",
+            },
+            "key": {
+                "kind": "string",
+                "name": "key",
+            },
+            "value": {
+                "kind": "*",
+                "name": "value",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "object",
+        "name": "hashmap",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        hashmap = normalize_hashmap(
+            get_input_value(node_inputs, "required_inputs", "hashmap")
+        )
+        key = get_input_value(node_inputs, "required_inputs", "key")
+        value = get_input_value(node_inputs, "required_inputs", "value")
+
+        hashmap[str(key)] = value
+        return hashmap
+
+
+class nsHashMapDelete:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns a HashMap with the provided key removed."
+
+    INPUT = {
+        "required_inputs": {
+            "hashmap": {
+                "kind": "object",
+                "name": "hashmap",
+            },
+            "key": {
+                "kind": "string",
+                "name": "key",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "object",
+        "name": "hashmap",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        hashmap = normalize_hashmap(
+            get_input_value(node_inputs, "required_inputs", "hashmap")
+        )
+        key = get_input_value(node_inputs, "required_inputs", "key")
+        hashmap.pop(str(key), None)
+        return hashmap
+
+
+class nsHashMapLength:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns the number of key-value pairs in a HashMap."
+
+    INPUT = {
+        "required_inputs": {
+            "hashmap": {
+                "kind": "object",
+                "name": "hashmap",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "integer",
+        "name": "length",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        hashmap = normalize_hashmap(
+            get_input_value(node_inputs, "required_inputs", "hashmap")
+        )
+        return len(hashmap)
+
+
+class nsHashMapGet:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns the value stored at a HashMap key."
+
+    INPUT = {
+        "required_inputs": {
+            "hashmap": {
+                "kind": "object",
+                "name": "hashmap",
+            },
+            "key": {
+                "kind": "string",
+                "name": "key",
+            },
+        },
+        "optional_inputs": {
+            "default": {
+                "kind": "*",
+                "name": "default",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "*",
+        "name": "value",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        hashmap = normalize_hashmap(
+            get_input_value(node_inputs, "required_inputs", "hashmap")
+        )
+        key = get_input_value(node_inputs, "required_inputs", "key")
+        default = get_input_value(node_inputs, "optional_inputs", "default")
+        return hashmap.get(str(key), default)
+
+
+class nsHashMapHasKey:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns whether a HashMap contains the provided key."
+
+    INPUT = {
+        "required_inputs": {
+            "hashmap": {
+                "kind": "object",
+                "name": "hashmap",
+            },
+            "key": {
+                "kind": "string",
+                "name": "key",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "boolean",
+        "name": "has_key",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        hashmap = normalize_hashmap(
+            get_input_value(node_inputs, "required_inputs", "hashmap")
+        )
+        key = get_input_value(node_inputs, "required_inputs", "key")
+        return str(key) in hashmap
+
+
+class nsHashMapKeys:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns the keys from a HashMap as an Array."
+
+    INPUT = {
+        "required_inputs": {
+            "hashmap": {
+                "kind": "object",
+                "name": "hashmap",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "array",
+        "name": "keys",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        hashmap = normalize_hashmap(
+            get_input_value(node_inputs, "required_inputs", "hashmap")
+        )
+        return list(hashmap.keys())
+
+
+class nsHashMapValues:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns the values from a HashMap as an Array."
+
+    INPUT = {
+        "required_inputs": {
+            "hashmap": {
+                "kind": "object",
+                "name": "hashmap",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "array",
+        "name": "values",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        hashmap = normalize_hashmap(
+            get_input_value(node_inputs, "required_inputs", "hashmap")
+        )
+        return list(hashmap.values())
+
+
+class nsHashMapMerge:
+    CATEGORY = "core"
+    SUBCATEGORY = "primitives"
+    DESCRIPTION = "Returns a HashMap with another HashMap merged into it."
+
+    INPUT = {
+        "required_inputs": {
+            "hashmap": {
+                "kind": "object",
+                "name": "hashmap",
+            },
+            "updates": {
+                "kind": "object",
+                "name": "updates",
+            },
+        },
+    }
+
+    OUTPUT = {
+        "kind": "object",
+        "name": "hashmap",
+        "cacheable": True,
+    }
+
+    def evaluate(self, node_inputs):
+        hashmap = normalize_hashmap(
+            get_input_value(node_inputs, "required_inputs", "hashmap")
+        )
+        updates = normalize_hashmap(
+            get_input_value(node_inputs, "required_inputs", "updates")
+        )
+        hashmap.update(updates)
+        return hashmap
 
 
 class nsArray:
@@ -23351,6 +23626,46 @@ EXTENSION_MAPPINGS = {
             "python_class": nsHashMap,
             "javascript_class_name": "nsHashMap",
             "display_name": "HashMap",
+        },
+        "nsHashMapInsert": {
+            "python_class": nsHashMapInsert,
+            "javascript_class_name": "nsHashMapInsert",
+            "display_name": "HashMapInsert",
+        },
+        "nsHashMapDelete": {
+            "python_class": nsHashMapDelete,
+            "javascript_class_name": "nsHashMapDelete",
+            "display_name": "HashMapDelete",
+        },
+        "nsHashMapLength": {
+            "python_class": nsHashMapLength,
+            "javascript_class_name": "nsHashMapLength",
+            "display_name": "HashMapLength",
+        },
+        "nsHashMapGet": {
+            "python_class": nsHashMapGet,
+            "javascript_class_name": "nsHashMapGet",
+            "display_name": "HashMapGet",
+        },
+        "nsHashMapHasKey": {
+            "python_class": nsHashMapHasKey,
+            "javascript_class_name": "nsHashMapHasKey",
+            "display_name": "HashMapHasKey",
+        },
+        "nsHashMapKeys": {
+            "python_class": nsHashMapKeys,
+            "javascript_class_name": "nsHashMapKeys",
+            "display_name": "HashMapKeys",
+        },
+        "nsHashMapValues": {
+            "python_class": nsHashMapValues,
+            "javascript_class_name": "nsHashMapValues",
+            "display_name": "HashMapValues",
+        },
+        "nsHashMapMerge": {
+            "python_class": nsHashMapMerge,
+            "javascript_class_name": "nsHashMapMerge",
+            "display_name": "HashMapMerge",
         },
         "nsArray": {
             "python_class": nsArray,
