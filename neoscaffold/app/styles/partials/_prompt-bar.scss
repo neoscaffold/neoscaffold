@@ -1,0 +1,86 @@
+// Natural-language entry point above the workflow canvas (v1.0.0).
+// Abbreviated prefix: npb (neo-prompt-bar).
+
+.neo-prompt-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: min(720px, 90%);
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(20, 20, 24, 0.88);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  color: #efebea;
+  font-size: 13px;
+
+  .npb-form {
+    display: flex;
+    gap: 8px;
+  }
+
+  .npb-input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    background: #17171b;
+    color: #efebea;
+    outline: none;
+
+    &:focus {
+      border-color: #b8d982;
+    }
+  }
+
+  .npb-submit {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    background: #b8d982;
+    color: #17171b;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  .npb-result {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .npb-summary {
+    font-weight: 600;
+  }
+
+  .npb-source {
+    opacity: 0.7;
+    font-weight: 400;
+  }
+
+  .npb-plan {
+    margin: 6px 0 0;
+    padding-left: 18px;
+  }
+
+  .npb-warnings {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    color: #e6b566;
+  }
+
+  .npb-error {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(200, 60, 60, 0.2);
+    color: #ffb4b4;
+  }
+}

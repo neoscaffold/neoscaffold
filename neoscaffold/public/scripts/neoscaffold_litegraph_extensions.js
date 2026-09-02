@@ -2368,6 +2368,82 @@
       }
     },
 
+    /**
+     * Insert an agent-built prompt-graph (from POST /v1/agent/build-graph) onto
+     * the current canvas. `result` has shape { prompt, layout }. Nodes are
+     * created by their registered type, literal inputs become widget values, and
+     * originId inputs become links. Returns the number of nodes created.
+     */
+    importPromptGraph(result) {
+      if (!result || !result.prompt || !this.graph) {
+        return 0;
+      }
+      const prompt = result.prompt;
+      const layout = result.layout || {};
+      const idToNode = {};
+      let created = 0;
+
+      // First pass: create nodes and apply literal (widget) inputs.
+      Object.keys(prompt).forEach((nodeId, index) => {
+        const spec = prompt[nodeId] || {};
+        const node = LiteGraph.createNode(spec.type);
+        if (!node) {
+          console.warn('[neoscaffold] unknown node type for prompt import:', spec.type);
+          return;
+        }
+        const pos = layout[nodeId] || [120 + index * 260, 200];
+        node.pos = [pos[0], pos[1]];
+        this.graph.add(node);
+        idToNode[nodeId] = node;
+        created += 1;
+
+        const inputs = spec.inputs || {};
+        Object.keys(inputs).forEach((inputName) => {
+          const value = inputs[inputName];
+          const isEdge = value && typeof value === 'object' && 'originId' in value;
+          if (isEdge || !node.widgets || !node.widgets.length) {
+            return;
+          }
+          const widget = node.widgets.find((w) => w.name === inputName);
+          if (widget) {
+            widget.value = value;
+          }
+        });
+      });
+
+      // Second pass: wire edges (originId inputs) between created nodes.
+      Object.keys(prompt).forEach((nodeId) => {
+        const target = idToNode[nodeId];
+        if (!target) {
+          return;
+        }
+        const inputs = (prompt[nodeId] || {}).inputs || {};
+        Object.keys(inputs).forEach((inputName) => {
+          const value = inputs[inputName];
+          const isEdge = value && typeof value === 'object' && 'originId' in value;
+          if (!isEdge) {
+            return;
+          }
+          const origin = idToNode[value.originId];
+          if (!origin || typeof origin.connect !== 'function') {
+            return;
+          }
+          const targetSlot = target.findInputSlot ? target.findInputSlot(inputName) : -1;
+          if (targetSlot >= 0) {
+            origin.connect(0, target, targetSlot);
+          }
+        });
+      });
+
+      if (this.graph.setDirtyCanvas) {
+        this.graph.setDirtyCanvas(true, true);
+      }
+      if (this.graph.change) {
+        this.graph.change();
+      }
+      return created;
+    },
+
     importGraphIntoCurrentFromFile(canvas) {
       const input = document.createElement('input');
       input.type = 'file';
