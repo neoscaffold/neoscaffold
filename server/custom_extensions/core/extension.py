@@ -154,7 +154,7 @@ def find_loop_end_node(graph, loop_node_id, end_node_kind):
     return end_loop_node_ids[0]
 
 
-version = "0.2.0"
+version = "1.0.0"
 
 
 class nsString:
