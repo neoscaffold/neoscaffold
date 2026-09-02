@@ -1,0 +1,20 @@
+{
+  "name": "NeoScaffold",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "cd /workspace/server && ./.venv/bin/python main.py --listen 0.0.0.0 --enable-cors-header \"*\"",
+      "description": "NeoScaffold Python 3.10 aiohttp API (port 6166)."
+    },
+    {
+      "name": "frontend",
+      "command": "export NVM_DIR=\"$HOME/.nvm\"; . \"$NVM_DIR/nvm.sh\"; export PATH=\"$(dirname \"$(nvm which 18)\"):$PATH\"; cd /workspace/neoscaffold && npm start -- --host 0.0.0.0 --port 4200",
+      "description": "NeoScaffold Ember (Node 18) dev server (port 4200)."
+    }
+  ],
+  "ports": [
+    { "name": "frontend", "port": 4200 },
+    { "name": "backend", "port": 6166 }
+  ]
+}
