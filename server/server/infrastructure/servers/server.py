@@ -17,6 +17,7 @@ from ...domain.services.graph_executor import GraphExecutor
 from ...domain.utilities.fallback_json_encoder import dumps
 from ..apis.base_routes import base_routes
 from ..apis.websocket_routes import base_websocket
+from ..apis.v1_routes import v1_routes
 
 # if python earlier than 3.12 import directly
 
@@ -75,6 +76,7 @@ class Server:
     def add_routes(self):
         base_routes(self)
         base_websocket(self)
+        v1_routes(self)
 
         # add aiohttp routes to the routing table
         self.app.add_routes(self.routes)

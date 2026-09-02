@@ -2,11 +2,13 @@ import asyncio
 import json
 import os
 import sys
+import time
 from aiohttp import web
 
 from ...domain.utilities.verify_google_token import verify_google_token
 from ...domain.utilities.authorize_user_and_get_info import authorize_user_and_get_info
 from ...domain.utilities.fallback_json_encoder import dumps
+from ...harness import observability
 
 
 def base_routes(server):
@@ -230,14 +232,48 @@ def base_routes(server):
                     execution_mode == "parallel"
                     or getattr(server, "ENABLE_PARALLEL_EXECUTION", False)
                 )
+                mode = "parallel" if run_parallel else "sequential"
                 graph_task = (
                     server.graph_executor.run_parallel(graph, response)
                     if run_parallel
                     else server.graph_executor.run_sequential(graph, response)
                 )
 
+                # Observability: count runs / nodes and time execution without
+                # touching the executor internals (harness.md §5).
+                async def _instrumented_run(task=graph_task, mode=mode):
+                    observability.inc(
+                        "neoscaffold_graph_runs_total",
+                        help="Prompt-graph executions started",
+                        mode=mode,
+                    )
+                    start = time.perf_counter()
+                    try:
+                        results = await task
+                        observability.inc(
+                            "neoscaffold_nodes_executed_total",
+                            amount=float(len(results or {})),
+                            help="Nodes executed across all graph runs",
+                            mode=mode,
+                        )
+                        return results
+                    except Exception:
+                        observability.inc(
+                            "neoscaffold_graph_run_errors_total",
+                            help="Graph runs that raised",
+                            mode=mode,
+                        )
+                        raise
+                    finally:
+                        observability.observe(
+                            "neoscaffold_graph_run_seconds",
+                            time.perf_counter() - start,
+                            help="Wall-clock duration of a graph run",
+                            mode=mode,
+                        )
+
                 # add the following to the server's run loop but don't block the request
-                asyncio.create_task(graph_task)
+                asyncio.create_task(_instrumented_run())
 
                 return web.json_response(response)
             else:
