@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0 - 2026-09-02
+
+- Added the `agent_swarm` extension: a fork-join swarm of coding agents. Prompt mode ("spawn a swarm of agents to solve the codeforces problems") builds a graph that fans out to one `SwarmSolverNode` per problem, collects results via a wired `nsArrayAppend` chain, and fork-joins them with `SwarmJoinNode`. Each agent writes a Python solution, streams its work to the UI scoped to its node, and verifies the solution in a subprocess sandbox against sample I/O. Offline/deterministic by default (reference solutions); live agents use OpenAI (default `gpt-5.6-terra`) with token streaming. Verified end-to-end: 10 concurrent live agents solved and verified 10/10 problems.
+- Added a subprocess code sandbox (`sandbox.run_python_code`) and a per-node live stream channel on the agent event log (`stream`/`streams`), exposed via `GET /v1/agent/events` (`streams`) and broadcast over the WebSocket (`agent_stream`); the editor's Agent Activity panel now shows each agent's live output scoped to its node.
+- Improved the natural-language graph builder to generate real node-to-node wiring: concatenation now builds an `nsString` per literal wired through an `nsArrayAppend` chain into `StringJoin` (edges, not literal arrays), pipe/pass-through phrasing inserts a wired `PassThrough`, and every result is wired into the logger. Added a two-row layout so wiring reads clearly, and the editor now auto fits-to-view after inserting a generated graph.
+- Added an OpenAPI 3.1 contract (`GET /v1/openapi.json`, `docs/openapi.json`) as the single source of truth for the API.
+- Added an MCP interface derived from the OpenAPI spec so other agents can control NeoScaffold: an OpenAPI→MCP tool converter, `GET /v1/mcp/tools`, and a runnable stdio MCP server (`server/mcp_server.py`) implementing `initialize`/`tools/list`/`tools/call` (see `docs/MCP.md`).
+- Added subagent visibility: an agent/subagent event log (`server/server/harness/agent_events.py`), instrumentation of the graph builder (parent build span + per-node child spans) and `PromptNode`/`BuildGraphNode`, `GET /v1/agent/events`, live WebSocket broadcast, and an editor **Agent Activity** panel.
+- Added the engineering harness (`harness.md`): typed boundaries, parse-over-validate, system lints, observability, and a sandbox seam.
+- Added `server/server/harness/`: `parsing` (typed `GraphSpec`/`NodeSpec` parse boundary + kind lattice), `observability` (dependency-free Prometheus metrics + structured JSON logs), `lint` (architecture lint CLI, `python -m server.harness.lint`), and `sandbox` (`run_guarded` timeout seam).
+- Added agent-generated graph topology: `graph_builder` turns natural language into a validated prompt-graph (offline deterministic planner by default; optional LLM planner whose output is parsed, repaired, or rejected).
+- Added the `agent_graph` extension with `PromptNode` (prompt-driven node, offline by default) and `BuildGraphNode` (builds sub-graphs — agents spinning up agents).
+- Added versioned HTTP surface: `POST /v1/agent/build-graph`, `GET /v1/metrics` (PromQL), `GET /v1/healthz`; instrumented graph execution with metrics.
+- Added a natural-language entry point in the editor: `neo-prompt-bar` component + `litegraph` Ember service + `importPromptGraph` canvas insertion.
+- Added `docs/ROADMAP_1.0.0.md` answering the vision's open questions and specifying the extension and core frontend/backend changes.
+- Added extensive tests: parse/observability/lint/sandbox unit tests, graph-builder unit + execution acceptance tests, and v1 route integration tests.
+
 ## 0.2.0 - 2026-05-09
 
 - Added parallel graph execution for async-capable nodes with configurable concurrency.

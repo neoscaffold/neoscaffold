@@ -1,0 +1,3 @@
+# The agent_graph extension adds no third-party dependencies.
+# Prompt-driven nodes run offline by default; an optional LLM-backed responder
+# reuses the existing `llm` extension's dependencies when a key is configured.

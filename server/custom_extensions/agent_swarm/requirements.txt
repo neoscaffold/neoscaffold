@@ -1,0 +1,4 @@
+# The agent_swarm extension reuses the `openai` dependency already declared in
+# the server's pyproject.toml for its live coder. No additional dependencies.
+# Set OPENAI_API_KEY to enable live agents (default model: gpt-5.6-terra);
+# otherwise the deterministic offline coder is used.

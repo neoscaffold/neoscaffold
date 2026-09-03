@@ -5,7 +5,7 @@ from argparse import ArgumentParser, Namespace
 
 from server import Server
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"
 
 
 def parse_inputs(disabled=False) -> Namespace:

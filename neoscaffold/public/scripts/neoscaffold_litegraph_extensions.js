@@ -185,6 +185,46 @@
       return body;
     },
 
+    // v1 agent API: build a graph from natural language.
+    async buildGraphFromPrompt(promptText, extras) {
+      const authorizationHeaders = await this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+      const payload = extras || {};
+      const response = await fetch(`${this.baseURL}/v1/agent/build-graph`, {
+        method: 'POST',
+        headers: authorizationHeaders,
+        body: JSON.stringify({
+          prompt: promptText,
+          canvas: payload.canvas || {},
+          history: payload.history || [],
+          workflow: payload.workflow || {},
+        }),
+      });
+      return this.parseJsonResponse(response);
+    },
+
+    async suggestExecutionFix(payload) {
+      const authorizationHeaders = await this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+      const response = await fetch(`${this.baseURL}/v1/agent/suggest-fix`, {
+        method: 'POST',
+        headers: authorizationHeaders,
+        body: JSON.stringify(payload || {}),
+      });
+      return this.parseJsonResponse(response);
+    },
+
+    // v1 agent API: recent subagent events + per-node live streams.
+    async fetchAgentActivity(limit = 100) {
+      const authorizationHeaders = await this.getAuthorizationHeaders();
+      const response = await fetch(
+        `${this.baseURL}/v1/agent/events?limit=${encodeURIComponent(limit)}`,
+        { method: 'GET', headers: authorizationHeaders },
+      );
+      const body = await this.parseJsonResponse(response);
+      return { events: body.events || [], streams: Object.values(body.streams || {}) };
+    },
+
     async queuePrompt(prompt) {
       // check if prompt is valid json
       try {
@@ -484,6 +524,9 @@
               selectedNodes[node.id] = node;
 
               global.NeoScaffold.graph.setDirtyCanvas(true);
+            }
+            scope.instance.proposeFixFromExecutionError(node, data.node_errors);
+            if (node) {
               return;
             }
           }
@@ -1092,6 +1135,8 @@
       scope.addSideMenuOptions(canvas);
       scope.addRuntimeButtons(canvas);
       scope.addZoomControls(canvas);
+      scope.addPromptBar(canvas);
+      scope.addAgentActivityPanel(canvas);
       scope.enableMultiNodeDragging(canvas);
       scope.addKeyboardShortcuts(canvas);
 
@@ -2337,6 +2382,10 @@
       // Remove all listeners
       window.removeEventListener('resize', this._resizeHandler);
       window.removeEventListener('mouseup', this._mouseupHandler);
+      if (this._agentActivityTimer) {
+        clearInterval(this._agentActivityTimer);
+        this._agentActivityTimer = null;
+      }
       if (this.runningProgressTimer) {
         clearInterval(this.runningProgressTimer);
         this.runningProgressTimer = null;
@@ -2365,6 +2414,662 @@
         };
 
         reader.readAsText(file); // Read the file content as text
+      }
+    },
+
+    /**
+     * Place nodes left-to-right, then top-to-bottom.
+     * Linear pipelines stay on one row; parallel stages share a row and later
+     * stages move down; disconnected nodes wrap like a reading-order grid.
+     */
+    layoutPromptGraph(prompt) {
+      const ids = Object.keys(prompt || {});
+      const preds = {};
+      const succs = {};
+      const indegree = {};
+      const ranks = {};
+      const originX = 80;
+      const originY = 80;
+      const colW = 280;
+      const rowH = 220;
+      const wrapCols = 4;
+      const idKey = (nodeId) => {
+        const asInt = parseInt(nodeId, 10);
+        return Number.isNaN(asInt) ? [1, String(nodeId)] : [0, asInt];
+      };
+      const cmpIds = (a, b) => {
+        const ka = idKey(a);
+        const kb = idKey(b);
+        return ka[0] - kb[0] || (ka[1] < kb[1] ? -1 : ka[1] > kb[1] ? 1 : 0);
+      };
+      const sortIds = (list) => list.slice().sort(cmpIds);
+
+      ids.forEach((nodeId) => {
+        preds[nodeId] = [];
+        succs[nodeId] = [];
+        indegree[nodeId] = 0;
+        ranks[nodeId] = 0;
+      });
+      ids.forEach((nodeId) => {
+        const inputs = (prompt[nodeId] || {}).inputs || {};
+        Object.keys(inputs).forEach((inputName) => {
+          const value = inputs[inputName];
+          if (!value || typeof value !== 'object' || value.originId == null) {
+            return;
+          }
+          const origin = String(value.originId);
+          if (!preds[nodeId] || origin === nodeId) {
+            return;
+          }
+          preds[nodeId].push(origin);
+          if (!succs[origin]) {
+            succs[origin] = [];
+          }
+          succs[origin].push(nodeId);
+        });
+      });
+      ids.forEach((nodeId) => {
+        indegree[nodeId] = preds[nodeId].length;
+      });
+
+      let queue = sortIds(ids.filter((nodeId) => indegree[nodeId] === 0));
+      const remaining = {};
+      ids.forEach((nodeId) => {
+        remaining[nodeId] = true;
+      });
+      while (queue.length) {
+        const nodeId = queue.shift();
+        delete remaining[nodeId];
+        (succs[nodeId] || []).forEach((succ) => {
+          ranks[succ] = Math.max(ranks[succ] || 0, (ranks[nodeId] || 0) + 1);
+          indegree[succ] -= 1;
+          if (indegree[succ] === 0) {
+            queue.push(succ);
+            queue = sortIds(queue);
+          }
+        });
+      }
+      const leftover = sortIds(Object.keys(remaining));
+      if (leftover.length) {
+        let base = -1;
+        ids.forEach((nodeId) => {
+          if (ranks[nodeId] > base) {
+            base = ranks[nodeId];
+          }
+        });
+        leftover.forEach((nodeId, offset) => {
+          ranks[nodeId] = base + 1 + offset;
+        });
+      }
+
+      const byRank = {};
+      ids.forEach((nodeId) => {
+        const rank = ranks[nodeId] || 0;
+        if (!byRank[rank]) {
+          byRank[rank] = [];
+        }
+        byRank[rank].push(nodeId);
+      });
+
+      const layout = {};
+      const placeRow = (nodeIds, y, alignToPreds) => {
+        const ordered = nodeIds.slice();
+        if (alignToPreds) {
+          ordered.sort((a, b) => {
+            const xa = (preds[a] || []).reduce((sum, origin) => {
+              return sum + (layout[origin] ? layout[origin][0] : 0);
+            }, 0);
+            const xb = (preds[b] || []).reduce((sum, origin) => {
+              return sum + (layout[origin] ? layout[origin][0] : 0);
+            }, 0);
+            const na = (preds[a] || []).filter((origin) => layout[origin]).length;
+            const nb = (preds[b] || []).filter((origin) => layout[origin]).length;
+            const ba = na ? xa / na : 0;
+            const bb = nb ? xb / nb : 0;
+            if (ba !== bb) {
+              return ba - bb;
+            }
+            return cmpIds(a, b);
+          });
+        } else {
+          ordered.sort(cmpIds);
+        }
+        ordered.forEach((nodeId, index) => {
+          const col = index % wrapCols;
+          const row = Math.floor(index / wrapCols);
+          layout[nodeId] = [originX + col * colW, y + row * rowH];
+        });
+        const extraRows = Math.max(0, Math.floor((ordered.length - 1) / wrapCols));
+        return y + (extraRows + 1) * rowH;
+      };
+
+      const rankKeys = Object.keys(byRank).map(Number).sort((a, b) => a - b);
+      const maxWidth = rankKeys.reduce((widest, rank) => {
+        return Math.max(widest, byRank[rank].length);
+      }, 1);
+      const maxRank = rankKeys.length ? rankKeys[rankKeys.length - 1] : 0;
+
+      if (maxRank === 0) {
+        placeRow(byRank[0] || [], originY, false);
+        return layout;
+      }
+
+      if (maxWidth === 1) {
+        ids.forEach((nodeId) => {
+          layout[nodeId] = [originX + (ranks[nodeId] || 0) * colW, originY];
+        });
+        return layout;
+      }
+
+      let y = originY;
+      rankKeys.forEach((rank) => {
+        y = placeRow(byRank[rank], y, true);
+      });
+      return layout;
+    },
+
+    /**
+     * Insert an agent-built prompt-graph (from POST /v1/agent/build-graph) onto
+     * the current canvas. `result` has shape { prompt, layout }. Nodes are
+     * created by their registered type, literal inputs become widget values, and
+     * originId inputs become links. Returns the number of nodes created.
+     */
+    importPromptGraph(result) {
+      if (!result || !result.prompt || !this.graph) {
+        return 0;
+      }
+      const prompt = result.prompt;
+      const computedLayout = this.layoutPromptGraph(prompt);
+      const layout = Object.assign({}, result.layout || {}, computedLayout);
+      const idToNode = {};
+      let created = 0;
+
+      // First pass: create nodes and apply literal (widget) inputs.
+      Object.keys(prompt).forEach((nodeId) => {
+        const spec = prompt[nodeId] || {};
+        const node = LiteGraph.createNode(spec.type);
+        if (!node) {
+          console.warn('[neoscaffold] unknown node type for prompt import:', spec.type);
+          return;
+        }
+        const pos = layout[nodeId] || computedLayout[nodeId] || [80, 80];
+        node.pos = [pos[0], pos[1]];
+        this.graph.add(node);
+        idToNode[nodeId] = node;
+        created += 1;
+
+        const inputs = spec.inputs || {};
+        Object.keys(inputs).forEach((inputName) => {
+          const value = inputs[inputName];
+          const isEdge = value && typeof value === 'object' && 'originId' in value;
+          if (isEdge || !node.widgets || !node.widgets.length) {
+            return;
+          }
+          const widget = node.widgets.find((w) => w.name === inputName);
+          if (widget) {
+            widget.value = value;
+          }
+        });
+      });
+
+      // Second pass: wire edges (originId inputs) between created nodes.
+      Object.keys(prompt).forEach((nodeId) => {
+        const target = idToNode[nodeId];
+        if (!target) {
+          return;
+        }
+        const inputs = (prompt[nodeId] || {}).inputs || {};
+        Object.keys(inputs).forEach((inputName) => {
+          const value = inputs[inputName];
+          const isEdge = value && typeof value === 'object' && 'originId' in value;
+          if (!isEdge) {
+            return;
+          }
+          const originId = value.originId == null ? '' : String(value.originId);
+          const origin = idToNode[originId];
+          if (!origin || typeof origin.connect !== 'function') {
+            console.warn(
+              '[neoscaffold] prompt import: missing origin',
+              originId,
+              'for',
+              nodeId + '.' + inputName
+            );
+            return;
+          }
+          let targetSlot = target.findInputSlot ? target.findInputSlot(inputName) : -1;
+          if (targetSlot < 0 && Array.isArray(target.inputs)) {
+            targetSlot = target.inputs.findIndex(function (slot) {
+              return slot && slot.name === inputName;
+            });
+          }
+          if (targetSlot < 0) {
+            console.warn(
+              '[neoscaffold] prompt import: no input slot',
+              inputName,
+              'on',
+              (prompt[nodeId] || {}).type || nodeId
+            );
+            return;
+          }
+          const link = origin.connect(0, target, targetSlot);
+          if (!link) {
+            console.warn(
+              '[neoscaffold] prompt import: connect failed',
+              originId,
+              '->',
+              nodeId + '.' + inputName
+            );
+          }
+        });
+      });
+
+      if (this.graph.setDirtyCanvas) {
+        this.graph.setDirtyCanvas(true, true);
+      }
+      if (this.graph.change) {
+        this.graph.change();
+      }
+
+      // Auto fit-to-view so the whole generated graph and its wiring are visible.
+      try {
+        this.fitViewToNodes(Object.values(idToNode));
+      } catch (error) {
+        console.warn('[neoscaffold] fitViewToNodes failed', error);
+      }
+
+      return created;
+    },
+
+    resolveGraphNode(nodeId, created) {
+      if (created && created[nodeId]) {
+        return created[nodeId];
+      }
+      if (!this.graph || nodeId == null || nodeId === '') {
+        return null;
+      }
+      const asString = String(nodeId);
+      let node = this.graph.getNodeById(nodeId);
+      if (!node && asString !== String(nodeId)) {
+        node = this.graph.getNodeById(asString);
+      }
+      if (!node) {
+        const asNumber = Number(asString);
+        if (!Number.isNaN(asNumber)) {
+          node = this.graph.getNodeById(asNumber);
+        }
+      }
+      if (!node && created) {
+        node = created[asString];
+      }
+      return node || null;
+    },
+
+    connectGraphInput(origin, target, inputName) {
+      if (!origin || !target || typeof origin.connect !== 'function') {
+        return false;
+      }
+      let targetSlot = target.findInputSlot ? target.findInputSlot(inputName) : -1;
+      if (targetSlot < 0 && Array.isArray(target.inputs)) {
+        targetSlot = target.inputs.findIndex(function (slot) {
+          return slot && slot.name === inputName;
+        });
+      }
+      if (targetSlot < 0) {
+        return false;
+      }
+      return Boolean(origin.connect(0, target, targetSlot));
+    },
+
+    applyGraphPatch(patch) {
+      if (!patch || !this.graph) {
+        return 0;
+      }
+      const addNodes = patch.add_nodes || {};
+      const created = {};
+      let changed = 0;
+
+      Object.keys(addNodes).forEach((nodeId) => {
+        const spec = addNodes[nodeId] || {};
+        const node = LiteGraph.createNode(spec.type);
+        if (!node) {
+          console.warn('[neoscaffold] unknown node type for patch:', spec.type);
+          return;
+        }
+        const origin = this.resolveGraphNode(
+          (spec.inputs && spec.inputs.ignored_input && spec.inputs.ignored_input.originId)
+            || (spec.inputs && spec.inputs.value && spec.inputs.value.originId)
+        );
+        if (origin && origin.pos) {
+          node.pos = [origin.pos[0] + 280, origin.pos[1] + 80];
+        }
+        if (spec.name) {
+          node.title = spec.name;
+        }
+        this.graph.add(node);
+        created[String(nodeId)] = node;
+        changed += 1;
+
+        const inputs = spec.inputs || {};
+        Object.keys(inputs).forEach((inputName) => {
+          const value = inputs[inputName];
+          const isEdge = value && typeof value === 'object' && value.originId != null;
+          if (isEdge || !node.widgets || !node.widgets.length) {
+            return;
+          }
+          const widget = node.widgets.find((w) => w.name === inputName);
+          if (widget) {
+            widget.value = value;
+          }
+        });
+      });
+
+      const applyEdge = (targetId, inputName, originId) => {
+        const origin = this.resolveGraphNode(originId, created);
+        const target = this.resolveGraphNode(targetId, created);
+        if (this.connectGraphInput(origin, target, inputName)) {
+          changed += 1;
+        } else {
+          console.warn(
+            '[neoscaffold] patch connect failed',
+            originId,
+            '->',
+            targetId + '.' + inputName
+          );
+        }
+      };
+
+      Object.keys(addNodes).forEach((nodeId) => {
+        const inputs = (addNodes[nodeId] || {}).inputs || {};
+        Object.keys(inputs).forEach((inputName) => {
+          const value = inputs[inputName];
+          if (value && typeof value === 'object' && value.originId != null) {
+            applyEdge(nodeId, inputName, value.originId);
+          }
+        });
+      });
+
+      (patch.wire || []).forEach((edge) => {
+        if (!edge || !edge.target || !edge.input || edge.originId == null) {
+          return;
+        }
+        applyEdge(edge.target, edge.input, edge.originId);
+      });
+
+      (patch.set || []).forEach((edit) => {
+        if (!edit) {
+          return;
+        }
+        const node = this.resolveGraphNode(edit.node_id, created);
+        if (!node || !node.widgets) {
+          return;
+        }
+        const widget = node.widgets.find((w) => w.name === edit.input);
+        if (widget) {
+          widget.value = edit.value;
+          changed += 1;
+        }
+      });
+
+      if (this.graph.setDirtyCanvas) {
+        this.graph.setDirtyCanvas(true, true);
+      }
+      if (this.graph.change) {
+        this.graph.change();
+      }
+      return changed;
+    },
+
+    firstExecutionErrorMessage(nodeErrors) {
+      const first = (nodeErrors && nodeErrors[0]) || {};
+      if (typeof first === 'string') {
+        return first;
+      }
+      return first.message || 'The graph run failed.';
+    },
+
+    localLoopBodyFix(prompt, nodeId) {
+      const graph = (prompt && prompt.prompt) || prompt || {};
+      const loopEnds = {
+        ForLoop: 'EndForLoop',
+        WhileLoop: 'EndWhileLoop',
+        ForEachLoop: 'EndForEachLoop',
+      };
+      const failed = graph[String(nodeId)] || null;
+      const loopType = (failed && loopEnds[failed.type] && failed.type)
+        || Object.keys(graph).map((id) => graph[id] && graph[id].type).find((typeName) => loopEnds[typeName]);
+      const loopId = (failed && loopEnds[failed.type])
+        ? String(nodeId)
+        : Object.keys(graph).find((id) => graph[id] && graph[id].type === loopType);
+      const endKind = loopEnds[loopType];
+      if (!loopId || !endKind) {
+        return null;
+      }
+      const bodyPref = ['ConcatString', 'StringJoin', 'CerebrasAgent', 'PassThrough', 'nsString'];
+      const skip = { [loopId]: true };
+      Object.keys(graph).forEach((id) => {
+        if (graph[id] && (graph[id].type === endKind || String(graph[id].type || '').indexOf('End') === 0)) {
+          skip[id] = true;
+        }
+      });
+      let bodyId = null;
+      bodyPref.forEach((typeName) => {
+        if (bodyId) {
+          return;
+        }
+        Object.keys(graph).forEach((id) => {
+          if (!bodyId && graph[id] && graph[id].type === typeName && !skip[id]) {
+            bodyId = id;
+          }
+        });
+      });
+      if (!bodyId) {
+        return null;
+      }
+      const ids = Object.keys(graph).map((id) => parseInt(id, 10) || 0);
+      const gateId = String((ids.length ? Math.max.apply(null, ids) : 0) + 1);
+      const wire = [];
+      Object.keys(graph).forEach((id) => {
+        if (graph[id] && graph[id].type === endKind) {
+          const inputs = graph[id].inputs || {};
+          if (!(inputs[loopType] && inputs[loopType].originId != null)) {
+            wire.push({ target: id, input: loopType, originId: loopId });
+          }
+          if (!(inputs.node_inputs && inputs.node_inputs.originId != null)) {
+            wire.push({ target: id, input: 'node_inputs', originId: gateId });
+          }
+        }
+      });
+      return {
+        ask: `The ${loopType} has no body — only ${endKind} is connected. Accept this patch to make node ${bodyId} (${graph[bodyId].type}) a loop successor via PassThrough?`,
+        suggestion: `Wire PassThrough.ignored_input from ${loopType} '${loopId}' and feed ${endKind}.node_inputs from that PassThrough so the loop has a body besides the end node.`,
+        armed: true,
+        patch: {
+          add_nodes: {
+            [gateId]: {
+              type: 'PassThrough',
+              name: 'loop body',
+              inputs: {
+                value: { originId: bodyId },
+                ignored_input: { originId: loopId },
+              },
+            },
+          },
+          wire,
+        },
+      };
+    },
+
+    async proposeFixFromExecutionError(node, nodeErrors) {
+      const message = this.firstExecutionErrorMessage(nodeErrors);
+      let snapshot = {};
+      try {
+        snapshot = await this.graphToPrompt(this.graph);
+      } catch (error) {
+        snapshot = {};
+      }
+      const prompt = snapshot.prompt || snapshot;
+      const nodeId = node ? String(node.id) : '';
+      let suggestion = null;
+      try {
+        suggestion = await this.api.suggestExecutionFix({
+          error: message,
+          node_id: nodeId,
+          prompt,
+          node_errors: nodeErrors,
+        });
+      } catch (error) {
+        suggestion = this.localLoopBodyFix(prompt, nodeId);
+        if (!suggestion) {
+          suggestion = {
+            ask: `${message} Tell me how you want it fixed, or ask the harness to rebuild.`,
+            suggestion: message,
+            armed: false,
+            patch: { add_nodes: {}, wire: [] },
+          };
+        }
+      }
+      this.offerExecutionFix(suggestion, message);
+    },
+
+    offerExecutionFix(suggestion, errorMessage) {
+      if (!suggestion) {
+        return;
+      }
+      const conversation = this.promptConversation;
+      if (!Array.isArray(conversation)) {
+        return;
+      }
+      const last = conversation[conversation.length - 1];
+      if (last && last.role === 'assistant' && last.patchStatus === 'armed' && last.error === errorMessage) {
+        return;
+      }
+      conversation.push({
+        role: 'assistant',
+        error: errorMessage,
+        thoughts: suggestion.suggestion || '',
+        output: suggestion.ask || suggestion.suggestion || errorMessage,
+        patch: suggestion.patch || { add_nodes: {}, wire: [] },
+        patchStatus: suggestion.armed ? 'armed' : 'none',
+      });
+      if (typeof this.expandPromptBar === 'function') {
+        this.expandPromptBar();
+      }
+      if (typeof this.renderPromptTranscript === 'function') {
+        this.renderPromptTranscript();
+      }
+    },
+
+    snapshotCanvasWidgets() {
+      const canvas = {};
+      const nodes = (this.graph && this.graph._nodes) || [];
+      nodes.forEach((node) => {
+        const widgets = {};
+        (node.widgets || []).forEach((widget) => {
+          if (!widget || !widget.name) {
+            return;
+          }
+          if (widget.options && widget.options.serialize === false) {
+            return;
+          }
+          widgets[widget.name] = widget.value;
+        });
+        canvas[String(node.id)] = {
+          type: node.type,
+          name: node.title || node.type,
+          widgets,
+        };
+      });
+      return canvas;
+    },
+
+    findCanvasNode(edit) {
+      const nodes = (this.graph && this.graph._nodes) || [];
+      if (!edit) {
+        return null;
+      }
+      if (edit.node_id != null && edit.node_id !== '') {
+        const match = nodes.find((node) => String(node.id) === String(edit.node_id));
+        if (match) {
+          return match;
+        }
+      }
+      if (edit.type) {
+        const typed = nodes.filter((node) => node.type === edit.type);
+        if (edit.name) {
+          const named = typed.find((node) => (node.title || '') === edit.name);
+          if (named) {
+            return named;
+          }
+        }
+        const index = Number(edit.index || 0);
+        return typed[index] || null;
+      }
+      return null;
+    },
+
+    applyWidgetEdits(edits) {
+      let applied = 0;
+      (edits || []).forEach((edit) => {
+        const node = this.findCanvasNode(edit);
+        if (!node || !node.widgets) {
+          return;
+        }
+        const widget = node.widgets.find((item) => item.name === edit.widget);
+        if (!widget) {
+          return;
+        }
+        widget.value = edit.value;
+        applied += 1;
+      });
+      if (applied) {
+        if (this.graph && this.graph.setDirtyCanvas) {
+          this.graph.setDirtyCanvas(true, true);
+        }
+        if (this.graph && this.graph.change) {
+          this.graph.change();
+        }
+      }
+      return applied;
+    },
+
+    /**
+     * Zoom/pan the canvas so all the given nodes (and their wires) fit in view.
+     * Uses the DragAndScale transform: canvasPos = (graphPos + offset) * scale.
+     */
+    fitViewToNodes(nodes) {
+      const canvas = this.litegraphCanvas;
+      if (!canvas || !canvas.ds || !canvas.canvas || !nodes || !nodes.length) {
+        return;
+      }
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      nodes.forEach((node) => {
+        const pos = node.pos || [0, 0];
+        const size = node.size || [140, 80];
+        minX = Math.min(minX, pos[0]);
+        minY = Math.min(minY, pos[1] - 30); // node title sits above pos
+        maxX = Math.max(maxX, pos[0] + size[0]);
+        maxY = Math.max(maxY, pos[1] + size[1]);
+      });
+      if (!isFinite(minX)) {
+        return;
+      }
+      const pad = 80;
+      const width = canvas.canvas.width;
+      const height = canvas.canvas.height;
+      const graphWidth = maxX - minX + pad * 2;
+      const graphHeight = maxY - minY + pad * 2;
+      let scale = Math.min(width / graphWidth, height / graphHeight);
+      scale = Math.max(0.15, Math.min(scale, 1));
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      canvas.ds.scale = scale;
+      canvas.ds.offset[0] = width / (2 * scale) - centerX;
+      canvas.ds.offset[1] = height / (2 * scale) - centerY;
+      if (canvas.setDirty) {
+        canvas.setDirty(true, true);
       }
     },
 
@@ -2426,6 +3131,23 @@
         filename += '.json';
       }
       return filename;
+    },
+
+    downloadExportedWorkflow(exported) {
+      const filename = this.sanitizeExportFilename(
+        this.getDefaultExportFilename()
+      );
+      const blob = new Blob([JSON.stringify(exported, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     },
 
     async exportWorkflow(filename) {
@@ -3244,6 +3966,532 @@
       return toolbar;
     },
 
+    /**
+     * Make a floating overlay movable from a dedicated handle, with a Reset
+     * button that restores the stylesheet / first-layout position.
+     */
+    enableOverlayDrag(element, handle, reset, options) {
+      const container = element.parentElement;
+      const hooks = options || {};
+      const original = {
+        left: element.style.left,
+        top: element.style.top,
+        right: element.style.right,
+        bottom: element.style.bottom,
+        transform: element.style.transform,
+      };
+      let drag = null;
+
+      const onPointerMove = (event) => {
+        if (!drag) {
+          return;
+        }
+        const containerRect = container.getBoundingClientRect();
+        let x = event.clientX - containerRect.left - drag.offsetX;
+        let y = event.clientY - containerRect.top - drag.offsetY;
+        const maxX = Math.max(0, container.clientWidth - element.offsetWidth);
+        const maxY = Math.max(0, container.clientHeight - element.offsetHeight);
+        x = Math.min(Math.max(0, x), maxX);
+        y = Math.min(Math.max(0, y), maxY);
+        element.style.left = `${x}px`;
+        element.style.top = `${y}px`;
+        element.style.right = 'auto';
+        element.style.bottom = 'auto';
+        element.style.transform = 'none';
+      };
+
+      const endDrag = () => {
+        if (!drag) {
+          return;
+        }
+        if (handle.releasePointerCapture && drag.pointerId != null) {
+          try {
+            handle.releasePointerCapture(drag.pointerId);
+          } catch (error) {
+            // capture may already have been released
+          }
+        }
+        drag = null;
+        element.classList.remove('is-dragging');
+        handle.classList.remove('is-dragging');
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', endDrag);
+      };
+
+      handle.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        const containerRect = container.getBoundingClientRect();
+        const elRect = element.getBoundingClientRect();
+        drag = {
+          pointerId: event.pointerId,
+          offsetX: event.clientX - elRect.left,
+          offsetY: event.clientY - elRect.top,
+        };
+        element.style.left = `${elRect.left - containerRect.left}px`;
+        element.style.top = `${elRect.top - containerRect.top}px`;
+        element.style.right = 'auto';
+        element.style.bottom = 'auto';
+        element.style.transform = 'none';
+        element.dataset.overlayMoved = 'true';
+        element.classList.add('is-dragging');
+        handle.classList.add('is-dragging');
+        if (handle.setPointerCapture) {
+          handle.setPointerCapture(event.pointerId);
+        }
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', endDrag);
+      });
+
+      reset.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        element.style.left = original.left;
+        element.style.top = original.top;
+        element.style.right = original.right;
+        element.style.bottom = original.bottom;
+        element.style.transform = original.transform;
+        delete element.dataset.overlayMoved;
+        element.classList.remove('is-moved', 'is-dragging');
+        if (typeof hooks.onReset === 'function') {
+          hooks.onReset();
+        }
+      });
+    },
+
+    createOverlayHandle(label) {
+      const handle = document.createElement('button');
+      handle.type = 'button';
+      handle.className = 'neo-overlay-handle';
+      handle.title = `Drag to move ${label}`;
+      handle.setAttribute('aria-label', `Move ${label}`);
+      handle.setAttribute('data-test-overlay-handle', '');
+      handle.textContent = '⋮⋮';
+      return handle;
+    },
+
+    createOverlayReset(label) {
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'neo-overlay-reset';
+      reset.title = `Reset ${label} position`;
+      reset.setAttribute('aria-label', `Reset ${label} position`);
+      reset.setAttribute('data-test-overlay-reset', '');
+      reset.textContent = 'Reset';
+      return reset;
+    },
+
+    /**
+     * Natural-language entry point (portable, self-contained): a prompt bar above
+     * the canvas that asks the backend to build a validated graph and inserts it.
+     */
+    addPromptBar(canvas) {
+      const scope = this;
+      const container = canvas.canvas.parentElement;
+      if (window.getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+      }
+
+      const bar = document.createElement('div');
+      bar.classList.add('neo-prompt-bar');
+      bar.setAttribute('data-test-prompt-bar', '');
+
+      const header = document.createElement('div');
+      header.classList.add('npb-header');
+
+      const handle = this.createOverlayHandle('prompt');
+      const reset = this.createOverlayReset('prompt');
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.classList.add('npb-toggle');
+      toggle.setAttribute('data-test-prompt-toggle', '');
+      toggle.setAttribute('aria-expanded', 'true');
+
+      header.appendChild(handle);
+      header.appendChild(toggle);
+      header.appendChild(reset);
+
+      const body = document.createElement('div');
+      body.classList.add('npb-body');
+
+      const transcript = document.createElement('div');
+      transcript.classList.add('npb-transcript');
+      transcript.setAttribute('data-test-prompt-transcript', '');
+      transcript.setAttribute('aria-label', 'Prompt conversation');
+
+      const form = document.createElement('form');
+      form.classList.add('npb-form');
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.classList.add('npb-input');
+      input.placeholder =
+        'Describe a workflow, e.g. concatenate "hello" and "world" then log it';
+      input.setAttribute('data-test-prompt-input', '');
+
+      const button = document.createElement('button');
+      button.type = 'submit';
+      button.classList.add('npb-submit');
+      button.textContent = 'Generate';
+      button.setAttribute('data-test-prompt-submit', '');
+
+      const result = document.createElement('div');
+      result.classList.add('npb-result');
+      result.style.display = 'none';
+
+      form.appendChild(input);
+      form.appendChild(button);
+      body.appendChild(transcript);
+      body.appendChild(form);
+      body.appendChild(result);
+      bar.appendChild(header);
+      bar.appendChild(body);
+      container.appendChild(bar);
+
+      const chrome = { open: true };
+      const conversation = [];
+      this.promptConversation = conversation;
+
+      const renderChrome = () => {
+        bar.classList.toggle('is-collapsed', !chrome.open);
+        toggle.textContent = `${chrome.open ? '▾' : '▸'} Prompt`;
+        toggle.setAttribute('aria-expanded', chrome.open ? 'true' : 'false');
+        body.hidden = !chrome.open;
+      };
+      toggle.addEventListener('click', () => {
+        chrome.open = !chrome.open;
+        renderChrome();
+      });
+      this.expandPromptBar = () => {
+        chrome.open = true;
+        renderChrome();
+      };
+      renderChrome();
+
+      const historyForApi = () => conversation.map((turn) => ({
+        role: turn.role,
+        content: turn.content || turn.output || turn.ask || turn.error || turn.thoughts || '',
+      }));
+
+      const renderTranscript = () => {
+        transcript.innerHTML = '';
+        conversation.forEach((turn) => {
+          const wrap = document.createElement('div');
+          wrap.className = `npb-turn npb-turn-${turn.role}`;
+          if (turn.role === 'user') {
+            const label = document.createElement('div');
+            label.className = 'npb-turn-label';
+            label.textContent = 'You';
+            const textEl = document.createElement('div');
+            textEl.className = 'npb-turn-text';
+            textEl.textContent = turn.content;
+            wrap.appendChild(label);
+            wrap.appendChild(textEl);
+          } else {
+            const label = document.createElement('div');
+            label.className = 'npb-turn-label';
+            label.textContent = 'Harness';
+            wrap.appendChild(label);
+            if (turn.thoughts) {
+              const thoughts = document.createElement('div');
+              thoughts.className = 'npb-thoughts';
+              thoughts.textContent = turn.thoughts;
+              wrap.appendChild(thoughts);
+            }
+            if ((turn.plan || []).length) {
+              const list = document.createElement('ol');
+              list.className = 'npb-plan';
+              turn.plan.forEach((step) => {
+                const item = document.createElement('li');
+                item.textContent = step;
+                list.appendChild(item);
+              });
+              wrap.appendChild(list);
+            }
+            if (turn.output) {
+              const output = document.createElement('div');
+              output.className = 'npb-turn-output';
+              output.textContent = turn.output;
+              wrap.appendChild(output);
+            }
+            if (turn.error) {
+              wrap.classList.add('npb-turn-error');
+              const err = document.createElement('div');
+              err.className = 'npb-error';
+              err.textContent = turn.error;
+              wrap.appendChild(err);
+            }
+            if (turn.patchStatus === 'armed') {
+              const actions = document.createElement('div');
+              actions.className = 'npb-patch-actions';
+              const accept = document.createElement('button');
+              accept.type = 'button';
+              accept.className = 'npb-accept';
+              accept.setAttribute('data-test-prompt-accept-patch', '');
+              accept.textContent = 'Accept patch';
+              accept.addEventListener('click', () => {
+                const applied = scope.applyGraphPatch(turn.patch);
+                turn.patchStatus = applied ? 'accepted' : 'failed';
+                turn.output = applied
+                  ? `${turn.output || 'Patch applied.'} Applied.`
+                  : `${turn.output || ''} Could not apply the patch.`;
+                renderTranscript();
+              });
+              const dismiss = document.createElement('button');
+              dismiss.type = 'button';
+              dismiss.className = 'npb-dismiss';
+              dismiss.setAttribute('data-test-prompt-dismiss-patch', '');
+              dismiss.textContent = 'Dismiss';
+              dismiss.addEventListener('click', () => {
+                turn.patchStatus = 'dismissed';
+                renderTranscript();
+              });
+              actions.appendChild(accept);
+              actions.appendChild(dismiss);
+              wrap.appendChild(actions);
+            } else if (turn.patchStatus === 'accepted') {
+              const status = document.createElement('div');
+              status.className = 'npb-patch-status';
+              status.textContent = 'Patch accepted';
+              wrap.appendChild(status);
+            } else if (turn.patchStatus === 'dismissed') {
+              const status = document.createElement('div');
+              status.className = 'npb-patch-status';
+              status.textContent = 'Patch dismissed';
+              wrap.appendChild(status);
+            }
+          }
+          transcript.appendChild(wrap);
+        });
+        transcript.hidden = conversation.length === 0;
+        transcript.scrollTop = transcript.scrollHeight;
+      };
+      this.renderPromptTranscript = renderTranscript;
+
+      const setBuilding = (building) => {
+        button.disabled = building;
+        input.disabled = building;
+        button.textContent = building ? 'Building…' : 'Generate';
+      };
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const text = (input.value || '').trim();
+        if (!text) {
+          return;
+        }
+        conversation.push({ role: 'user', content: text });
+        renderTranscript();
+        input.value = '';
+        setBuilding(true);
+        result.style.display = 'none';
+        result.classList.remove('npb-error');
+        try {
+          let workflowSnapshot = {};
+          try {
+            workflowSnapshot = await scope.graphToPrompt(scope.graph);
+          } catch (error) {
+            workflowSnapshot = {};
+          }
+          const build = await scope.api.buildGraphFromPrompt(text, {
+            canvas: scope.snapshotCanvasWidgets(),
+            history: historyForApi(),
+            workflow: workflowSnapshot,
+          });
+          const edited = scope.applyWidgetEdits(build.widget_edits || []);
+          const created = (build.prompt && Object.keys(build.prompt).length)
+            ? scope.importPromptGraph(build)
+            : 0;
+          let exported = 0;
+          if (build.exported_workflow) {
+            scope.downloadExportedWorkflow(build.exported_workflow);
+            exported = 1;
+          }
+          const parts = [];
+          if (created) {
+            parts.push(`Added ${created} node(s)`);
+          }
+          if (edited) {
+            parts.push(`Updated ${edited} widget(s)`);
+          }
+          if (exported) {
+            parts.push('Exported workflow JSON');
+          }
+          if (!parts.length) {
+            parts.push('No graph or widget changes');
+          }
+          const output = `${parts.join(' · ')} (${build.source || ''})`;
+          conversation.push({
+            role: 'assistant',
+            thoughts: build.thoughts || '',
+            plan: build.plan || [],
+            output,
+          });
+          renderTranscript();
+          result.innerHTML = '';
+          const summary = document.createElement('div');
+          summary.classList.add('npb-summary');
+          summary.textContent = output;
+          result.appendChild(summary);
+          result.style.display = 'block';
+        } catch (error) {
+          const message = error.message || 'Failed to build graph';
+          conversation.push({ role: 'assistant', error: message });
+          renderTranscript();
+          result.innerHTML = '';
+          result.textContent = message;
+          result.classList.add('npb-error');
+          result.setAttribute('data-test-prompt-error', '');
+          result.style.display = 'block';
+        } finally {
+          setBuilding(false);
+        }
+      });
+
+      this.enableOverlayDrag(bar, handle, reset);
+      this.promptBarElement = bar;
+      return bar;
+    },
+
+    /**
+     * Subagent visibility panel (portable, self-contained): shows recent agent
+     * events and each agent's live output stream, scoped to its node. Polls the
+     * backend while mounted.
+     */
+    addAgentActivityPanel(canvas) {
+      const scope = this;
+      const container = canvas.canvas.parentElement;
+
+      const panel = document.createElement('div');
+      panel.classList.add('neo-agent-activity');
+      panel.setAttribute('data-test-agent-activity', '');
+
+      const header = document.createElement('div');
+      header.classList.add('npa-header');
+      const handle = this.createOverlayHandle('agent activity');
+      const reset = this.createOverlayReset('agent activity');
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.classList.add('npa-toggle');
+      toggle.setAttribute('data-test-agent-toggle', '');
+      toggle.setAttribute('aria-expanded', 'false');
+      const refresh = document.createElement('button');
+      refresh.type = 'button';
+      refresh.classList.add('npa-refresh');
+      refresh.textContent = 'Refresh';
+      header.appendChild(handle);
+      header.appendChild(toggle);
+      header.appendChild(refresh);
+      header.appendChild(reset);
+
+      const body = document.createElement('div');
+      body.classList.add('npa-body');
+      body.setAttribute('data-test-agent-body', '');
+
+      panel.appendChild(header);
+      panel.appendChild(body);
+      container.appendChild(panel);
+
+      const state = { open: false, events: [], streams: [] };
+
+      const render = () => {
+        panel.classList.toggle('is-collapsed', !state.open);
+        toggle.textContent = `${state.open ? '▾' : '▸'} Agent Activity (${state.events.length})`;
+        toggle.setAttribute('aria-expanded', state.open ? 'true' : 'false');
+        body.style.display = state.open ? 'block' : 'none';
+        if (!state.open) {
+          return;
+        }
+        body.innerHTML = '';
+
+        if (state.streams.length) {
+          const title = document.createElement('div');
+          title.className = 'npa-section-title';
+          title.textContent = 'Live agent streams';
+          body.appendChild(title);
+          state.streams.forEach((stream) => {
+            const details = document.createElement('details');
+            details.className = 'npa-stream';
+            details.open = true;
+            details.setAttribute('data-test-agent-stream', '');
+            const summary = document.createElement('summary');
+            summary.className = 'npa-stream-name';
+            summary.textContent = stream.name || stream.node_id;
+            const pre = document.createElement('pre');
+            pre.className = 'npa-stream-text';
+            pre.textContent = stream.text || '';
+            details.appendChild(summary);
+            details.appendChild(pre);
+            body.appendChild(details);
+          });
+        }
+
+        if (state.events.length) {
+          const title = document.createElement('div');
+          title.className = 'npa-section-title';
+          title.textContent = 'Events';
+          body.appendChild(title);
+          const list = document.createElement('ul');
+          list.className = 'npa-list';
+          state.events.forEach((eventItem) => {
+            const item = document.createElement('li');
+            item.className = `npa-event npa-${eventItem.status} npa-kind-${eventItem.kind}`;
+            item.setAttribute('data-test-agent-event', '');
+            const status = document.createElement('span');
+            status.className = 'npa-status';
+            status.textContent = eventItem.status;
+            const kind = document.createElement('span');
+            kind.className = 'npa-kind';
+            kind.textContent = eventItem.kind;
+            const name = document.createElement('span');
+            name.className = 'npa-name';
+            name.textContent = eventItem.name;
+            item.appendChild(status);
+            item.appendChild(kind);
+            item.appendChild(name);
+            list.appendChild(item);
+          });
+          body.appendChild(list);
+        } else if (!state.streams.length) {
+          const empty = document.createElement('div');
+          empty.className = 'npa-empty';
+          empty.textContent = 'No agent activity yet. Generate a graph to see subagents.';
+          body.appendChild(empty);
+        }
+      };
+
+      const refreshData = async () => {
+        try {
+          const { events, streams } = await scope.api.fetchAgentActivity(100);
+          state.events = events.slice().reverse();
+          state.streams = streams;
+          render();
+        } catch (error) {
+          // keep the last rendered state on transient failures
+        }
+      };
+
+      toggle.addEventListener('click', () => {
+        state.open = !state.open;
+        render();
+      });
+      refresh.addEventListener('click', refreshData);
+
+      render();
+      refreshData();
+      if (this._agentActivityTimer) {
+        clearInterval(this._agentActivityTimer);
+      }
+      this._agentActivityTimer = setInterval(refreshData, 2000);
+      this.enableOverlayDrag(panel, handle, reset);
+      this.agentActivityElement = panel;
+      return panel;
+    },
+
     zoomCanvas(canvas, zoomMultiplier) {
       if (!canvas || !canvas.setZoom || !canvas.ds) {
         return;
@@ -3362,142 +4610,123 @@
     },
 
     addSideMenuOptions(canvas) {
-      // Create floating side menu container
       const sideMenu = document.createElement('div');
-      sideMenu.style.position = 'absolute';
-      sideMenu.style.backgroundColor = '#2c2c2c';
-      sideMenu.style.padding = '10px';
-      sideMenu.style.borderRadius = '5px';
-      sideMenu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-      sideMenu.style.zIndex = '1000';
-      sideMenu.dataset.collapsed = 'false';
-      sideMenu.classList.add('neoscaffold-side-menu');
+      sideMenu.classList.add('neoscaffold-side-menu', 'neo-side-menu');
+      sideMenu.setAttribute('data-test-side-menu', '');
 
-      const menuContent = document.createElement('div');
-      menuContent.style.paddingTop = '24px';
-      menuContent.classList.add('neoscaffold-side-menu-content');
+      const header = document.createElement('div');
+      header.classList.add('nsm-header');
 
-      const createSideMenuButton = function(label, title, callback) {
+      const handle = this.createOverlayHandle('menu');
+      const reset = this.createOverlayReset('menu');
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.classList.add('nsm-toggle');
+      toggle.setAttribute('data-test-side-menu-toggle', '');
+      toggle.setAttribute('aria-expanded', 'true');
+
+      header.appendChild(handle);
+      header.appendChild(toggle);
+      header.appendChild(reset);
+
+      const body = document.createElement('div');
+      body.classList.add('nsm-body');
+      body.setAttribute('data-test-side-menu-body', '');
+
+      const createAction = (item) => {
         const button = document.createElement('button');
-        button.innerText = label;
-        button.title = title;
-        button.setAttribute('aria-label', title);
-        button.style.display = 'block';
-        button.style.width = '100%';
-        button.style.padding = '8px 15px';
-        button.style.marginBottom = '5px';
-        button.style.border = 'none';
-        button.style.borderRadius = '3px';
-        button.style.backgroundColor = '#3c3c3c';
-        button.style.color = '#fff';
-        button.style.cursor = 'pointer';
-
-        button.addEventListener('mouseover', () => {
-          button.style.backgroundColor = '#4c4c4c';
-        });
-
-        button.addEventListener('mouseout', () => {
-          button.style.backgroundColor = '#3c3c3c';
-        });
-
-        button.addEventListener('click', callback);
+        button.type = 'button';
+        button.className = item.danger ? 'nsm-action nsm-action-danger' : 'nsm-action';
+        button.textContent = item.label;
+        button.title = item.title || item.label;
+        button.setAttribute('aria-label', item.title || item.label);
+        button.addEventListener('click', item.callback);
         return button;
       };
 
-      const collapseButton = document.createElement('button');
-      collapseButton.innerText = '›';
-      collapseButton.title = 'Collapse Menu';
-      collapseButton.setAttribute('aria-label', 'Collapse Menu');
-      collapseButton.style.position = 'absolute';
-      collapseButton.style.top = '6px';
-      collapseButton.style.right = '6px';
-      collapseButton.style.width = '24px';
-      collapseButton.style.height = '24px';
-      collapseButton.style.padding = '0';
-      collapseButton.style.border = 'none';
-      collapseButton.style.borderRadius = '3px';
-      collapseButton.style.backgroundColor = '#3c3c3c';
-      collapseButton.style.color = '#fff';
-      collapseButton.style.cursor = 'pointer';
-      collapseButton.style.lineHeight = '24px';
+      const appendSection = (title, items) => {
+        const heading = document.createElement('div');
+        heading.className = 'nsm-section-title';
+        heading.textContent = title;
+        body.appendChild(heading);
+        items.forEach((item) => {
+          body.appendChild(createAction(item));
+        });
+      };
 
-      collapseButton.addEventListener('mouseover', () => {
-        collapseButton.style.backgroundColor = '#4c4c4c';
-      });
-
-      collapseButton.addEventListener('mouseout', () => {
-        collapseButton.style.backgroundColor = '#3c3c3c';
-      });
-
-      collapseButton.addEventListener('click', () => {
-        const isCollapsed = sideMenu.dataset.collapsed === 'true';
-        sideMenu.dataset.collapsed = isCollapsed ? 'false' : 'true';
-        menuContent.style.display = isCollapsed ? 'block' : 'none';
-        collapseButton.innerText = isCollapsed ? '›' : '‹';
-        collapseButton.title = isCollapsed ? 'Collapse Menu' : 'Expand Menu';
-        collapseButton.setAttribute('aria-label', collapseButton.title);
-        this.updateSideMenuPosition(canvas);
-      });
-      sideMenu.appendChild(collapseButton);
-
-      // Add buttons to side menu
-      const menuItems = [
+      appendSection('Workflow', [
         {
           label: 'Queue',
           title: 'Run the current workflow.',
-          callback: () => NeoScaffold.queuePrompt(1)
+          callback: () => NeoScaffold.queuePrompt(1),
         },
         {
           label: 'Export',
           title: 'Export the current workflow to a file.',
-          callback: () => NeoScaffold.exportWorkflowWithSaveDialog()
+          callback: () => NeoScaffold.exportWorkflowWithSaveDialog(),
         },
         {
           label: 'Import',
           title: 'Import a workflow file from your computer.',
-          callback: () => document.getElementById('workflow-input').click()
+          callback: () => document.getElementById('workflow-input').click(),
         },
         {
           label: 'Import Into Current',
-          callback: () => NeoScaffold.importGraphIntoCurrentFromFile(canvas)
+          title: 'Import a workflow into the current canvas.',
+          callback: () => NeoScaffold.importGraphIntoCurrentFromFile(canvas),
         },
+      ]);
+      appendSection('Debug', [
         {
           label: 'Toggle Breakpoints',
           title: 'Toggle breakpoint markers on the selected nodes.',
-          callback: () => NeoScaffold.toggleBreakpoints(canvas)
+          callback: () => NeoScaffold.toggleBreakpoints(canvas),
         },
         {
           label: 'Step Through Breakpoints',
           title: 'Resume paused execution through the selected breakpoint nodes.',
-          callback: () => NeoScaffold.stepThroughBreakpoints(canvas)
+          callback: () => NeoScaffold.stepThroughBreakpoints(canvas),
         },
         {
           label: 'Toggle Stop Points',
           title: 'Toggle stop markers on the selected nodes.',
-          callback: () => NeoScaffold.toggleStopPoints(canvas)
+          callback: () => NeoScaffold.toggleStopPoints(canvas),
         },
         {
           label: 'Toggle Restart Points',
           title: 'Toggle restart markers on the selected nodes.',
-          callback: () => NeoScaffold.toggleRestartPoints(canvas)
+          callback: () => NeoScaffold.toggleRestartPoints(canvas),
         },
         {
           label: 'Clear',
           title: 'Clear the current canvas.',
-          callback: () => NeoScaffold.clean()
-        }
-      ];
+          danger: true,
+          callback: () => NeoScaffold.clean(),
+        },
+      ]);
 
-      menuItems.forEach(item => {
-        const button = createSideMenuButton(item.label, item.title, item.callback);
-        menuContent.appendChild(button);
-      });
-      sideMenu.appendChild(menuContent);
-
+      sideMenu.appendChild(header);
+      sideMenu.appendChild(body);
       canvas.canvas.parentElement.appendChild(sideMenu);
 
-      // Update position initially and on canvas resize
-      this.updateSideMenuPosition(canvas);
+      const chrome = { open: true };
+      const renderChrome = () => {
+        sideMenu.classList.toggle('is-collapsed', !chrome.open);
+        toggle.textContent = `${chrome.open ? '▾' : '▸'} Menu`;
+        toggle.setAttribute('aria-expanded', chrome.open ? 'true' : 'false');
+        body.hidden = !chrome.open;
+      };
+      toggle.addEventListener('click', () => {
+        chrome.open = !chrome.open;
+        renderChrome();
+      });
+      renderChrome();
+
+      this.enableOverlayDrag(sideMenu, handle, reset, {
+        onReset: () => this.updateSideMenuPosition(canvas),
+      });
+      this.sideMenuElement = sideMenu;
+      return sideMenu;
     },
 
     /**
@@ -3505,32 +4734,19 @@
      * @param {LiteGraphCanvas} canvas
      */
     updateSideMenuPosition(canvas) {
-      // find all side menu elements by class name
       const sideMenus = document.getElementsByClassName('neoscaffold-side-menu');
-
-      // get current canvas width
-      const canvasContainer = canvas.canvas.parentElement;
-      const canvasContainerWidth = canvasContainer.clientWidth;
-
       for (const sideMenu of sideMenus) {
-        if (sideMenu.dataset.collapsed === 'true') {
-          sideMenu.style.width = '36px';
-          sideMenu.style.minWidth = '36px';
-          sideMenu.style.height = '36px';
-          sideMenu.style.padding = '0';
-        } else {
-          // side menu should be 1/5 of the canvas width or 150px, whichever is greater
-          sideMenu.style.width = `${Math.max(canvasContainerWidth / 5, 150)}px`;
-          sideMenu.style.minWidth = '';
-          sideMenu.style.height = '';
-          sideMenu.style.padding = '10px';
+        if (sideMenu.dataset.overlayMoved === 'true') {
+          continue;
         }
-
-        const sideMenuRect = sideMenu.getBoundingClientRect();
-        const sideMenuX = canvasContainerWidth - sideMenuRect.width - 30;
-        const sideMenuY = (canvasContainer.clientHeight / 2) - sideMenuRect.height / 2;
-        sideMenu.style.left = `${sideMenuX}px`;
-        sideMenu.style.top = `${sideMenuY}px`;
+        sideMenu.style.left = '';
+        sideMenu.style.top = '';
+        sideMenu.style.right = '';
+        sideMenu.style.width = '';
+        sideMenu.style.height = '';
+        sideMenu.style.minWidth = '';
+        sideMenu.style.padding = '';
+        sideMenu.style.transform = '';
       }
     }
 
