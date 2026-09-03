@@ -65,6 +65,29 @@ def test_built_join_graph_executes():
     assert graph_results[log_ids[0]].values == "foo bar"
 
 
+def test_built_wired_join_edges_execute_end_to_end():
+    # The concat path is a wired nsString -> nsArray/append chain -> StringJoin.
+    result = build_graph('concatenate "alpha" and "beta" then log it', known_nodes=KNOWN)
+    # sanity: the graph actually contains wiring, not a literal array
+    join = next(n for n in result.prompt.values() if n["type"] == "StringJoin")
+    assert isinstance(join["inputs"]["array"], dict) and "originId" in join["inputs"]["array"]
+
+    graph_results, _ = _run(result.prompt, "parallel")
+    log_ids = [nid for nid, n in result.prompt.items() if n["type"] == "ConsoleLog"]
+    assert graph_results[log_ids[0]].values == "alpha beta"
+    # also verify sequential mode wires identically
+    graph_results_seq, _ = _run(result.prompt, "sequential")
+    assert graph_results_seq[log_ids[0]].values == "alpha beta"
+
+
+def test_built_passthrough_pipe_executes():
+    result = build_graph('log "piped" through a passthrough', known_nodes=KNOWN)
+    graph_results, _ = _run(result.prompt, "parallel")
+    log_ids = [nid for nid, n in result.prompt.items() if n["type"] == "ConsoleLog"]
+    assert graph_results[log_ids[0]].values == "piped"
+    assert any(n["type"] == "PassThrough" for n in result.prompt.values())
+
+
 def test_built_graph_executes_sequentially_too():
     result = build_graph('log "seq mode"', known_nodes=KNOWN)
     graph_results, _ = _run(result.prompt, "sequential")

@@ -32,11 +32,28 @@ def _authorized_user(request):
     return user_id, None
 
 
+# Node types that are pure sources/leaves; placed on an upper row so the wiring
+# into the main pipeline row reads clearly.
+_SOURCE_NODE_TYPES = {"nsString", "nsArray", "nsInteger", "nsFloat", "nsBoolean"}
+
+
 def _layout(prompt):
-    """Assign a simple left-to-right layout so the editor can place nodes."""
+    """Two-row left-to-right layout so wired edges are easy to see.
+
+    Source/leaf nodes go on the top row, pipeline nodes (append/join/passthrough/
+    log/...) on the main row, each advanced left-to-right in creation order.
+    """
     layout = {}
-    for index, node_id in enumerate(prompt):
-        layout[node_id] = [120 + index * 260, 200]
+    top_x = 120
+    main_x = 120
+    for node_id, node in prompt.items():
+        node_type = (node or {}).get("type", "")
+        if node_type in _SOURCE_NODE_TYPES:
+            layout[node_id] = [top_x, 70]
+            top_x += 220
+        else:
+            layout[node_id] = [main_x, 300]
+            main_x += 260
     return layout
 
 

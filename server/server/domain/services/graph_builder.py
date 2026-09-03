@@ -33,11 +33,15 @@ STRING_NODE = "nsString"
 JOIN_NODE = "StringJoin"
 LOG_NODE = "ConsoleLog"
 PROMPT_NODE = "PromptNode"
+ARRAY_NODE = "nsArray"
+ARRAY_APPEND_NODE = "nsArrayAppend"
+PASS_NODE = "PassThrough"
 
 _QUOTED = re.compile(r"[\"'“”‘’]([^\"'“”‘’]+)[\"'“”‘’]")
 _JOIN_WORDS = ("concat", "join", "combine", "append", "merge")
 _LOG_WORDS = ("log", "print", "console", "output", "display", "show")
 _STRING_WORDS = ("string", "text", "message", "say", "word")
+_PIPE_WORDS = ("pipe", "pipeline", "passthrough", "pass through", "chain", "forward", "through")
 
 
 @dataclass
@@ -152,6 +156,7 @@ class GraphBuilder:
         literals = [m.strip() for m in _QUOTED.findall(text) if m.strip()]
         wants_join = any(word in lowered for word in _JOIN_WORDS)
         wants_log = any(word in lowered for word in _LOG_WORDS)
+        wants_pipe = any(word in lowered for word in _PIPE_WORDS)
         mentions_string = any(word in lowered for word in _STRING_WORDS)
 
         plan: List[str] = []
@@ -164,29 +169,45 @@ class GraphBuilder:
             payload[node_id] = {"type": node_type, "name": name, "inputs": inputs}
             return node_id
 
+        def edge(node_id: str) -> Dict[str, str]:
+            return {"originId": node_id}
+
+        # Whether we can build a fully-wired concatenation (string nodes -> array
+        # append chain -> join) instead of a single literal-fed node.
+        can_wire_join = all(
+            self._has(node_type)
+            for node_type in (STRING_NODE, ARRAY_NODE, ARRAY_APPEND_NODE, JOIN_NODE)
+        )
+
+        def wire_join(items: List[str]) -> str:
+            # Collect one nsString per literal into an array via a wired
+            # nsArrayAppend chain, then StringJoin the array. Real node-to-node
+            # edges throughout (this is the "understands wiring" path).
+            array_id = add(ARRAY_NODE, "array", {})
+            plan.append("Create an empty array (nsArray) as the collector.")
+            current = array_id
+            for index, literal in enumerate(items):
+                string_id = add(STRING_NODE, f"string {index + 1}", {"text": literal})
+                current = add(
+                    ARRAY_APPEND_NODE,
+                    f"append {index + 1}",
+                    {"array": edge(current), "element": edge(string_id)},
+                )
+                plan.append(f"Create string {literal!r} and wire it into the array.")
+            join_id = add(JOIN_NODE, "join", {"array": edge(current), "delimiter": " "})
+            plan.append("Join the collected strings into one (StringJoin), wired from the array.")
+            return join_id
+
         source_id: Optional[str] = None
 
-        if wants_join and self._has(JOIN_NODE) and literals:
-            source_id = add(
-                JOIN_NODE,
-                "join",
-                {"array": literals, "delimiter": " "},
-            )
-            plan.append(f"Join {len(literals)} string(s) with a space via {JOIN_NODE}.")
+        if literals and can_wire_join and (wants_join or len(literals) > 1):
+            source_id = wire_join(literals)
         elif literals and self._has(STRING_NODE):
-            if len(literals) > 1 and self._has(JOIN_NODE):
-                source_id = add(
-                    JOIN_NODE, "join", {"array": literals, "delimiter": " "}
-                )
-                plan.append(f"Join {len(literals)} strings via {JOIN_NODE}.")
-            else:
-                source_id = add(STRING_NODE, "string", {"text": literals[0]})
-                plan.append(f"Create a string {STRING_NODE!r} = {literals[0]!r}.")
+            source_id = add(STRING_NODE, "string", {"text": literals[0]})
+            plan.append(f"Create a string = {literals[0]!r}.")
         elif (mentions_string or wants_log) and self._has(STRING_NODE):
-            # No quoted literal: echo the intent text as the string content.
-            content = text
-            source_id = add(STRING_NODE, "string", {"text": content})
-            plan.append(f"Create a string from the prompt text.")
+            source_id = add(STRING_NODE, "string", {"text": text})
+            plan.append("Create a string from the prompt text.")
 
         # Fallback: a prompt-driven node if available, else echo the prompt.
         if source_id is None:
@@ -197,10 +218,15 @@ class GraphBuilder:
                 source_id = add(STRING_NODE, "string", {"text": text})
                 plan.append("Create a string from the prompt text (fallback).")
 
-        # Log the result by default, or when explicitly requested.
-        if source_id is not None and self._has(LOG_NODE) and (wants_log or True):
-            add(LOG_NODE, "log", {"any": {"originId": source_id}})
-            plan.append(f"Log the result with {LOG_NODE}.")
+        # Optional PassThrough link when the user asks to pipe/chain/pass through.
+        if source_id is not None and wants_pipe and self._has(PASS_NODE):
+            source_id = add(PASS_NODE, "passthrough", {"value": edge(source_id)})
+            plan.append("Route the value through a PassThrough link.")
+
+        # Always wire the result into a logger so the graph has an output sink.
+        if source_id is not None and self._has(LOG_NODE):
+            add(LOG_NODE, "log", {"any": edge(source_id)})
+            plan.append(f"Wire the result into {LOG_NODE}.")
 
         spec = parse_graph(payload, contracts=self.contracts)
         warnings = lint_graph(spec, self.contracts) if self.contracts else []

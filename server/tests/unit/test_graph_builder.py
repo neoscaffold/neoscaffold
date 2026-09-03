@@ -32,12 +32,50 @@ def test_offline_log_string_builds_valid_graph():
     )
 
 
-def test_offline_join_builds_stringjoin():
+def _is_edge(value):
+    return isinstance(value, dict) and "originId" in value
+
+
+def test_offline_join_builds_wired_graph():
     result = build_graph('concatenate "foo" and "bar" then log it', known_nodes=KNOWN)
-    assert "StringJoin" in _types(result)
-    assert "ConsoleLog" in _types(result)
-    join = next(n for n in result.prompt.values() if n["type"] == "StringJoin")
-    assert join["inputs"]["array"] == ["foo", "bar"]
+    types = _types(result)
+    # Real wiring: string nodes -> array -> append chain -> join -> log
+    assert types.count("nsString") == 2
+    assert "nsArray" in types
+    assert types.count("nsArrayAppend") == 2
+    assert "StringJoin" in types
+    assert "ConsoleLog" in types
+
+    prompt = result.prompt
+    # The join's array input is wired from a node, not a literal.
+    join = next(n for n in prompt.values() if n["type"] == "StringJoin")
+    assert _is_edge(join["inputs"]["array"])
+    # The logger's input is wired from the join.
+    log = next(n for n in prompt.values() if n["type"] == "ConsoleLog")
+    assert _is_edge(log["inputs"]["any"])
+    # Each append wires both an array and an element edge.
+    for node in prompt.values():
+        if node["type"] == "nsArrayAppend":
+            assert _is_edge(node["inputs"]["array"])
+            assert _is_edge(node["inputs"]["element"])
+
+
+def test_offline_multiple_literals_wire_even_without_join_word():
+    result = build_graph('log "a" and "b" and "c"', known_nodes=KNOWN)
+    types = _types(result)
+    assert types.count("nsString") == 3
+    assert types.count("nsArrayAppend") == 3
+    assert "StringJoin" in types
+
+
+def test_offline_pipe_inserts_wired_passthrough():
+    result = build_graph('log "x" through a passthrough', known_nodes=KNOWN)
+    types = _types(result)
+    assert "PassThrough" in types
+    pt = next(n for n in result.prompt.values() if n["type"] == "PassThrough")
+    assert _is_edge(pt["inputs"]["value"])
+    log = next(n for n in result.prompt.values() if n["type"] == "ConsoleLog")
+    assert _is_edge(log["inputs"]["any"])
 
 
 def test_offline_defaults_to_log_of_prompt_text():
