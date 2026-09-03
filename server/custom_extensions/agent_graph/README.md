@@ -34,8 +34,10 @@ Turns a natural-language prompt into a validated NeoScaffold sub-graph — the
   `NEOSCAFFOLD_GRAPH_MODEL`; force offline with `NEOSCAFFOLD_GRAPH_OFFLINE=1`).
   Invalid model output is repaired or rejected, then falls back to the offline
   planner. After parse, the harness also repairs **disconnected** graphs: it
-  fills empty `prompt` literals from the user request and wires unused outputs
-  into unwired required dataflow inputs (never inventing nodes or API keys).
+  fills empty `prompt` literals from the user request, wires unused outputs
+  into unwired required dataflow inputs, and inserts `ValuePath` nodes when a
+  dict-producing agent is wired into ConcatString/ConsoleLog (default path
+  `summary`). It never invents API keys.
 
 ## Reliability
 

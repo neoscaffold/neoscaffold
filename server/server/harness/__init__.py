@@ -22,6 +22,7 @@ from .parsing import (
     lint_graph,
     parse_graph,
     repair_connectivity,
+    insert_value_path_adapters,
 )
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
     "lint_graph",
     "parse_graph",
     "repair_connectivity",
+    "insert_value_path_adapters",
 ]

@@ -449,3 +449,120 @@ def _next_unused_producer(
         if is_assignable(origin_contract.output_kind, target_kind):
             return origin_id
     return None
+
+
+VALUE_PATH_NODE = "ValuePath"
+
+# Default field to extract when a node returns a dict that a string consumer
+# should not swallow whole.
+DICT_OUTPUT_PATHS = {
+    "CerebrasAgent": "summary",
+    "CerebrasAgentAsync": "summary",
+    "SwarmSolverNode": "code",
+}
+
+# Inputs that expect a scalar/text after a dict has been deconstructed.
+STRINGISH_CONSUMER_INPUTS = {
+    "ConcatString": frozenset({"a", "b"}),
+    "StringJoin": frozenset({"delimiter"}),
+    "ConsoleLog": frozenset({"any"}),
+    "PromptNode": frozenset({"input"}),
+}
+
+
+def _next_node_id(payload: Mapping[str, Any]) -> str:
+    highest = 0
+    for node_id in payload:
+        try:
+            highest = max(highest, int(node_id))
+        except (TypeError, ValueError):
+            continue
+    return str(highest + 1)
+
+
+def _default_value_path(origin_type: str) -> str:
+    return DICT_OUTPUT_PATHS.get(origin_type, "summary")
+
+
+def insert_value_path_adapters(
+    payload: Any,
+    *,
+    contracts: Optional[Mapping[str, NodeContract]] = None,
+) -> tuple:
+    """Insert ``ValuePath`` nodes between dict producers and string consumers.
+
+    Bounded repair (harness.md §6): only inserts ``ValuePath``, only when the
+    origin type is a known dict-output node (or already a ValuePath with an
+    empty path). Never invents other node types or credentials.
+    """
+    repairs: List[str] = []
+    if not isinstance(payload, dict) or not payload:
+        return payload if isinstance(payload, dict) else {}, repairs
+    if contracts is not None and VALUE_PATH_NODE not in contracts:
+        return payload, repairs
+
+    # Fill empty value_path literals from the wired origin's default field.
+    for node_id, node in list(payload.items()):
+        if not isinstance(node, dict) or node.get("type") != VALUE_PATH_NODE:
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        if not _is_unfilled(inputs.get("value_path")):
+            continue
+        object_ref = inputs.get("object")
+        origin_type = ""
+        if _is_edge_value(object_ref):
+            origin = payload.get(object_ref.get("originId"))
+            if isinstance(origin, dict):
+                origin_type = origin.get("type") or ""
+        inputs["value_path"] = _default_value_path(origin_type)
+        repairs.append(
+            f"filled '{node_id}.value_path' with '{inputs['value_path']}'"
+        )
+
+    splices: List[tuple] = []
+    for target_id, node in payload.items():
+        if not isinstance(node, dict):
+            continue
+        target_type = node.get("type")
+        if target_type == VALUE_PATH_NODE:
+            continue
+        consumer_inputs = STRINGISH_CONSUMER_INPUTS.get(target_type)
+        if not consumer_inputs:
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        for input_name, value in inputs.items():
+            if input_name not in consumer_inputs or not _is_edge_value(value):
+                continue
+            origin_id = value.get("originId")
+            origin = payload.get(origin_id)
+            if not isinstance(origin, dict):
+                continue
+            origin_type = origin.get("type")
+            if origin_type == VALUE_PATH_NODE:
+                continue
+            if origin_type not in DICT_OUTPUT_PATHS:
+                continue
+            splices.append((target_id, input_name, origin_id, origin_type))
+
+    for target_id, input_name, origin_id, origin_type in splices:
+        path = _default_value_path(origin_type)
+        adapter_id = _next_node_id(payload)
+        payload[adapter_id] = {
+            "type": VALUE_PATH_NODE,
+            "name": f"path {path}",
+            "inputs": {
+                "object": {"originId": origin_id},
+                "value_path": path,
+            },
+        }
+        payload[target_id]["inputs"][input_name] = {"originId": adapter_id}
+        repairs.append(
+            f"inserted ValuePath '{adapter_id}' ({path}) between "
+            f"'{origin_id}' and '{target_id}.{input_name}'"
+        )
+
+    return payload, repairs

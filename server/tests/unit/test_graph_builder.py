@@ -210,6 +210,14 @@ def test_llm_empty_agent_prompts_are_filled():
     assert all(n["inputs"].get("prompt") for n in agents)
     join = next(n for n in result.prompt.values() if n["type"] == "ConcatString")
     assert _is_edge(join["inputs"]["a"]) and _is_edge(join["inputs"]["b"])
+    paths = [n for n in result.prompt.values() if n["type"] == "ValuePath"]
+    assert len(paths) == 2
+    assert all(n["inputs"]["value_path"] == "summary" for n in paths)
+    assert all(_is_edge(n["inputs"]["object"]) for n in paths)
+    # ConcatString is fed by ValuePath nodes, not raw agent dicts.
+    path_ids = {nid for nid, n in result.prompt.items() if n["type"] == "ValuePath"}
+    assert join["inputs"]["a"]["originId"] in path_ids
+    assert join["inputs"]["b"]["originId"] in path_ids
 
 
 def test_planner_prompt_includes_registration_contracts():
@@ -219,6 +227,8 @@ def test_planner_prompt_includes_registration_contracts():
     assert "ConcatString:" in text
     assert "in a, b" in text
     assert "originId" in text
+    assert "ValuePath" in text
+    assert "summary" in text
 
 
 def test_make_openai_planner_none_without_key(monkeypatch):

@@ -278,3 +278,93 @@ def test_repair_connectivity_fills_empty_prompts_from_user_intent():
     assert repaired["2"]["inputs"]["prompt"] == "describe painting ideas (agent 2)"
     assert "api_key" not in repaired["1"]["inputs"]
     assert any("filled" in r for r in repairs)
+
+
+def test_insert_value_path_between_agent_and_concat():
+    from server.harness.parsing import insert_value_path_adapters
+
+    class FakeAgent:
+        INPUT = {"required_inputs": {"prompt": {"kind": "string", "name": "prompt"}}}
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    class FakeConcat:
+        INPUT = {
+            "required_inputs": {
+                "a": {"kind": "*", "name": "a"},
+                "b": {"kind": "*", "name": "b"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    class FakeValuePath:
+        INPUT = {
+            "required_inputs": {
+                "object": {"kind": "*", "name": "object"},
+                "value_path": {"kind": "*", "name": "value_path"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    nodes = {
+        **NODES,
+        "CerebrasAgent": {"python_class": FakeAgent},
+        "ConcatString": {"python_class": FakeConcat},
+        "ValuePath": {"python_class": FakeValuePath},
+    }
+    contracts = contracts_from_nodes(nodes)
+    payload = {
+        "1": {"type": "CerebrasAgent", "inputs": {"prompt": "a"}},
+        "2": {"type": "CerebrasAgent", "inputs": {"prompt": "b"}},
+        "3": {
+            "type": "ConcatString",
+            "inputs": {"a": {"originId": "1"}, "b": {"originId": "2"}},
+        },
+        "4": {"type": "ConsoleLog", "inputs": {"any": {"originId": "3"}}},
+    }
+    repaired, repairs = insert_value_path_adapters(payload, contracts=contracts)
+    paths = [n for n in repaired.values() if n["type"] == "ValuePath"]
+    assert len(paths) == 2
+    assert all(n["inputs"]["value_path"] == "summary" for n in paths)
+    assert repaired["3"]["inputs"]["a"]["originId"] not in {"1", "2"}
+    assert repaired["3"]["inputs"]["b"]["originId"] not in {"1", "2"}
+    assert repaired[repaired["3"]["inputs"]["a"]["originId"]]["inputs"]["object"] == {
+        "originId": "1"
+    }
+    assert any("ValuePath" in r for r in repairs)
+    # ConsoleLog stays wired from ConcatString, not from an agent dict.
+    assert repaired["4"]["inputs"]["any"] == {"originId": "3"}
+
+
+def test_insert_value_path_fills_empty_path_literal():
+    from server.harness.parsing import insert_value_path_adapters
+
+    class FakeAgent:
+        INPUT = {"required_inputs": {"prompt": {"kind": "string", "name": "prompt"}}}
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    class FakeValuePath:
+        INPUT = {
+            "required_inputs": {
+                "object": {"kind": "*", "name": "object"},
+                "value_path": {"kind": "*", "name": "value_path"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    nodes = {
+        **NODES,
+        "CerebrasAgent": {"python_class": FakeAgent},
+        "ValuePath": {"python_class": FakeValuePath},
+    }
+    contracts = contracts_from_nodes(nodes)
+    payload = {
+        "1": {"type": "CerebrasAgent", "inputs": {"prompt": "x"}},
+        "2": {
+            "type": "ValuePath",
+            "inputs": {"object": {"originId": "1"}, "value_path": ""},
+        },
+    }
+    repaired, repairs = insert_value_path_adapters(payload, contracts=contracts)
+    assert repaired["2"]["inputs"]["value_path"] == "summary"
+    assert any("value_path" in r for r in repairs)
+    assert len([n for n in repaired.values() if n["type"] == "ValuePath"]) == 1

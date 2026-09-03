@@ -27,6 +27,7 @@ from ...harness.parsing import (
     lint_graph,
     parse_graph,
     repair_connectivity,
+    insert_value_path_adapters,
 )
 
 DEFAULT_GRAPH_MODEL = os.environ.get("NEOSCAFFOLD_GRAPH_MODEL", "gpt-4o-mini")
@@ -329,6 +330,10 @@ class GraphBuilder:
             candidate, contracts=self.contracts, user_prompt=text
         )
         repairs.extend(conn_repairs)
+        candidate, path_repairs = insert_value_path_adapters(
+            candidate, contracts=self.contracts
+        )
+        repairs.extend(path_repairs)
         if first_error is not None and drop_repairs:
             repairs.append(f"repaired after: {first_error}")
 
@@ -356,6 +361,8 @@ class GraphBuilder:
         plan = ["Graph proposed by LLM, parsed and accepted."]
         if conn_repairs:
             plan.append("Harness wired disconnected nodes and filled empty prompts.")
+        if path_repairs:
+            plan.append("Harness inserted ValuePath nodes to deconstruct dict outputs.")
         return BuildResult(
             spec=spec,
             prompt=spec.to_prompt(),
@@ -427,6 +434,7 @@ _PREFERRED_PLANNER_TYPES = (
     "CerebrasAgentAsync",
     "SwarmSolverNode",
     "SwarmJoinNode",
+    "ValuePath",
     "nsString",
     "ConcatString",
     "StringJoin",
@@ -489,8 +497,15 @@ def _planner_prompt(known_nodes: Optional[Mapping[str, Any]]) -> str:
         "from the user's request. Distinct agents get distinct prompts.\n"
         "- Do not invent api_key values; omit them or leave them empty.\n"
         "- Prefer a small DAG that ends in ConsoleLog.\n"
+        "- Dict outputs MUST be deconstructed with ValuePath before concat/log:\n"
+        "  CerebrasAgent/CerebrasAgentAsync returns "
+        "{chat_id, chat_history, summary, cost, human_input}.\n"
+        "  SwarmSolverNode returns {problem_id, title, code, verified, ...}.\n"
+        "  ValuePath.object is an originId; value_path is a literal field name "
+        "(default 'summary' for agents, 'code' for swarm solvers).\n"
         "- Two agents whose results are combined MUST look like this pattern:\n"
-        "  CerebrasAgent/PromptNode -> ConcatString.a / ConcatString.b -> ConsoleLog.any\n"
+        "  CerebrasAgent -> ValuePath(summary) -> ConcatString.a / .b -> ConsoleLog.any\n"
+        "- Never wire an agent dict straight into ConcatString or ConsoleLog.\n"
         "- Only use node types from this palette (preferred, with contracts):\n"
         f"{palette}\n"
         f"Other allowed types (name only): {others}\n"

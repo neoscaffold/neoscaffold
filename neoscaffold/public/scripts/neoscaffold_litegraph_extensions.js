@@ -3413,6 +3413,20 @@
       bar.classList.add('neo-prompt-bar');
       bar.setAttribute('data-test-prompt-bar', '');
 
+      const header = document.createElement('div');
+      header.classList.add('npb-header');
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.classList.add('npb-toggle');
+      toggle.setAttribute('data-test-prompt-toggle', '');
+      toggle.setAttribute('aria-expanded', 'true');
+
+      header.appendChild(toggle);
+
+      const body = document.createElement('div');
+      body.classList.add('npb-body');
+
       const form = document.createElement('form');
       form.classList.add('npb-form');
 
@@ -3435,9 +3449,24 @@
 
       form.appendChild(input);
       form.appendChild(button);
-      bar.appendChild(form);
-      bar.appendChild(result);
+      body.appendChild(form);
+      body.appendChild(result);
+      bar.appendChild(header);
+      bar.appendChild(body);
       container.appendChild(bar);
+
+      const chrome = { open: true };
+      const renderChrome = () => {
+        bar.classList.toggle('is-collapsed', !chrome.open);
+        toggle.textContent = `${chrome.open ? '▾' : '▸'} Prompt`;
+        toggle.setAttribute('aria-expanded', chrome.open ? 'true' : 'false');
+        body.hidden = !chrome.open;
+      };
+      toggle.addEventListener('click', () => {
+        chrome.open = !chrome.open;
+        renderChrome();
+      });
+      renderChrome();
 
       const setBuilding = (building) => {
         button.disabled = building;
@@ -3507,6 +3536,7 @@
       toggle.type = 'button';
       toggle.classList.add('npa-toggle');
       toggle.setAttribute('data-test-agent-toggle', '');
+      toggle.setAttribute('aria-expanded', 'false');
       const refresh = document.createElement('button');
       refresh.type = 'button';
       refresh.classList.add('npa-refresh');
@@ -3522,10 +3552,12 @@
       panel.appendChild(body);
       container.appendChild(panel);
 
-      const state = { open: true, events: [], streams: [] };
+      const state = { open: false, events: [], streams: [] };
 
       const render = () => {
+        panel.classList.toggle('is-collapsed', !state.open);
         toggle.textContent = `${state.open ? '▾' : '▸'} Agent Activity (${state.events.length})`;
+        toggle.setAttribute('aria-expanded', state.open ? 'true' : 'false');
         body.style.display = state.open ? 'block' : 'none';
         if (!state.open) {
           return;

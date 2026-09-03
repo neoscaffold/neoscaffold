@@ -127,7 +127,10 @@ NL prompt ──▶ Planner ──▶ GraphSpec (typed) ──▶ parse_graph �
   executed blindly. A proposal that parses but is **disconnected** (no
   `originId` wires) is still repaired: unused producers are wired into unwired
   required dataflow inputs, and empty `prompt` literals are filled from the
-  user's request. Credential fields (`api_key`, …) are never invented.
+  user's request. When a dict-producing node (e.g. `CerebrasAgent`) is wired
+  into a string consumer (`ConcatString`, `ConsoleLog`), the harness inserts a
+  `ValuePath` adapter (default field `summary`) rather than concatenating the
+  raw dict. Credential fields (`api_key`, …) are never invented.
 
 Every builder result is parsed before it leaves the service, so the endpoint and
 the editor only ever receive graphs that already satisfy §1–§2.
@@ -187,13 +190,16 @@ policy:
 | Situation | Action |
 | --- | --- |
 | Structurally invalid (fails `parse_graph`) and cheaply fixable | **Repair** (drop dangling edges, coerce assignable kinds) then re-parse |
-| Multi-node graph with no wires, or empty `prompt`/`text` literals | **Repair** (wire unused producers into unwired required dataflow inputs in id order; fill empty prompt literals from the user request). Never invents nodes or credentials. |
+| Multi-node graph with no wires, or empty `prompt`/`text` literals | **Repair** (wire unused producers into unwired required dataflow inputs in id order; fill empty prompt literals from the user request). Never invents credentials. |
+| Dict producer wired into a string consumer | **Repair** by inserting a `ValuePath` adapter (bounded: only that node type; default path `summary` / `code`) |
 | Structurally invalid and not cheaply fixable | **Reject** with a `ParseError` describing the exact `path` |
 | Parses but violates a defended constraint (unsafe node, missing sandbox) | **Escalate** to a human with the failing constraint attached |
 | Parses and only trips a *warning* | **Proceed**, attach the warning to context |
 
-Repair is bounded and deterministic; it never invents nodes. Rejections and
-escalations are logged as metrics so their frequency is observable.
+Repair is bounded and deterministic. It does not invent arbitrary nodes; the
+one allowed insertion is a ``ValuePath`` adapter that deconstructs a known dict
+output. Rejections and escalations are logged as metrics so their frequency is
+observable.
 
 ---
 
