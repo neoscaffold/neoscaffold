@@ -2441,7 +2441,56 @@
       if (this.graph.change) {
         this.graph.change();
       }
+
+      // Auto fit-to-view so the whole generated graph and its wiring are visible.
+      try {
+        this.fitViewToNodes(Object.values(idToNode));
+      } catch (error) {
+        console.warn('[neoscaffold] fitViewToNodes failed', error);
+      }
+
       return created;
+    },
+
+    /**
+     * Zoom/pan the canvas so all the given nodes (and their wires) fit in view.
+     * Uses the DragAndScale transform: canvasPos = (graphPos + offset) * scale.
+     */
+    fitViewToNodes(nodes) {
+      const canvas = this.litegraphCanvas;
+      if (!canvas || !canvas.ds || !canvas.canvas || !nodes || !nodes.length) {
+        return;
+      }
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      nodes.forEach((node) => {
+        const pos = node.pos || [0, 0];
+        const size = node.size || [140, 80];
+        minX = Math.min(minX, pos[0]);
+        minY = Math.min(minY, pos[1] - 30); // node title sits above pos
+        maxX = Math.max(maxX, pos[0] + size[0]);
+        maxY = Math.max(maxY, pos[1] + size[1]);
+      });
+      if (!isFinite(minX)) {
+        return;
+      }
+      const pad = 80;
+      const width = canvas.canvas.width;
+      const height = canvas.canvas.height;
+      const graphWidth = maxX - minX + pad * 2;
+      const graphHeight = maxY - minY + pad * 2;
+      let scale = Math.min(width / graphWidth, height / graphHeight);
+      scale = Math.max(0.15, Math.min(scale, 1));
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      canvas.ds.scale = scale;
+      canvas.ds.offset[0] = width / (2 * scale) - centerX;
+      canvas.ds.offset[1] = height / (2 * scale) - centerY;
+      if (canvas.setDirty) {
+        canvas.setDirty(true, true);
+      }
     },
 
     importGraphIntoCurrentFromFile(canvas) {
