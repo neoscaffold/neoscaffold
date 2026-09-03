@@ -39,24 +39,31 @@ class AgentEvent:
 class AgentEventLog:
     """A bounded, thread-safe log of agent/subagent events with live subscribers."""
 
-    def __init__(self, capacity: int = 500):
+    def __init__(self, capacity: int = 500, stream_char_cap: int = 8000, stream_node_cap: int = 64):
         self._lock = threading.Lock()
         self._capacity = capacity
+        self._stream_char_cap = stream_char_cap
+        self._stream_node_cap = stream_node_cap
         self._events: "OrderedDict[str, AgentEvent]" = OrderedDict()
+        self._streams: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
         self._counter = itertools.count(1)
         self._subscribers: List[Callable[[Dict[str, Any]], None]] = []
 
     def _next_id(self) -> str:
         return f"ae-{next(self._counter)}"
 
-    def _notify(self, event: AgentEvent) -> None:
-        payload = event.to_dict()
+    def _notify(self, payload: Dict[str, Any]) -> None:
         for subscriber in list(self._subscribers):
             try:
                 subscriber(payload)
             except Exception:
                 # A dead/failing subscriber must never break event emission.
                 pass
+
+    def _notify_event(self, event: AgentEvent) -> None:
+        payload = event.to_dict()
+        payload["type"] = "event"
+        self._notify(payload)
 
     def subscribe(self, callback: Callable[[Dict[str, Any]], None]) -> None:
         with self._lock:
@@ -89,7 +96,7 @@ class AgentEventLog:
             while len(self._events) > self._capacity:
                 self._events.popitem(last=False)
             snapshot = AgentEvent(**event.to_dict())
-        self._notify(snapshot)
+        self._notify_event(snapshot)
         return event.id
 
     def finish(
@@ -108,7 +115,7 @@ class AgentEventLog:
             if detail:
                 event.detail.update(detail)
             snapshot = AgentEvent(**event.to_dict())
-        self._notify(snapshot)
+        self._notify_event(snapshot)
 
     def record(
         self,
@@ -131,9 +138,41 @@ class AgentEventLog:
             events = events[-limit:]
         return [event.to_dict() for event in events]
 
+    def stream(self, node_id: str, chunk: str, *, name: Optional[str] = None) -> None:
+        """Append a live output chunk for a node's agent and notify subscribers.
+
+        Streams are scoped to the associated node id so the UI can show each
+        agent's current output next to its node.
+        """
+        with self._lock:
+            entry = self._streams.get(node_id)
+            if entry is None:
+                entry = {"node_id": node_id, "name": name or node_id, "text": ""}
+                self._streams[node_id] = entry
+                while len(self._streams) > self._stream_node_cap:
+                    self._streams.popitem(last=False)
+            if name:
+                entry["name"] = name
+            entry["text"] = (entry["text"] + (chunk or ""))[-self._stream_char_cap :]
+            entry["updated_at"] = time.time()
+            payload = {
+                "type": "stream",
+                "node_id": node_id,
+                "name": entry["name"],
+                "chunk": chunk,
+                "text": entry["text"],
+                "updated_at": entry["updated_at"],
+            }
+        self._notify(payload)
+
+    def streams(self) -> Dict[str, Dict[str, Any]]:
+        with self._lock:
+            return {node_id: dict(entry) for node_id, entry in self._streams.items()}
+
     def clear(self) -> None:
         with self._lock:
             self._events.clear()
+            self._streams.clear()
 
 
 # Process-wide default log.

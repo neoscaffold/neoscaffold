@@ -47,6 +47,32 @@ def test_subscribers_receive_events():
     log.subscribe(lambda e: seen.append(e))
     log.record("test", "x")
     assert seen and seen[-1]["kind"] == "test"
+    assert seen[-1]["type"] == "event"
+
+
+def test_stream_accumulates_per_node_and_notifies():
+    log = AgentEventLog()
+    seen = []
+    log.subscribe(lambda p: seen.append(p))
+    log.stream("node-1", "hello ", name="cf 1")
+    log.stream("node-1", "world", name="cf 1")
+    log.stream("node-2", "other", name="cf 2")
+
+    streams = log.streams()
+    assert streams["node-1"]["text"] == "hello world"
+    assert streams["node-1"]["name"] == "cf 1"
+    assert streams["node-2"]["text"] == "other"
+
+    stream_payloads = [p for p in seen if p.get("type") == "stream"]
+    assert stream_payloads[-1]["node_id"] == "node-2"
+    assert stream_payloads[0]["chunk"] == "hello "
+
+
+def test_stream_char_cap():
+    log = AgentEventLog(stream_char_cap=10)
+    log.stream("n", "0123456789abcdef")
+    assert len(log.streams()["n"]["text"]) == 10
+    assert log.streams()["n"]["text"] == "6789abcdef"
 
 
 def test_failing_subscriber_does_not_break_emit():

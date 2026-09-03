@@ -36,12 +36,34 @@ PROMPT_NODE = "PromptNode"
 ARRAY_NODE = "nsArray"
 ARRAY_APPEND_NODE = "nsArrayAppend"
 PASS_NODE = "PassThrough"
+SWARM_SOLVER_NODE = "SwarmSolverNode"
+SWARM_JOIN_NODE = "SwarmJoinNode"
 
 _QUOTED = re.compile(r"[\"'“”‘’]([^\"'“”‘’]+)[\"'“”‘’]")
 _JOIN_WORDS = ("concat", "join", "combine", "append", "merge")
 _LOG_WORDS = ("log", "print", "console", "output", "display", "show")
 _STRING_WORDS = ("string", "text", "message", "say", "word")
 _PIPE_WORDS = ("pipe", "pipeline", "passthrough", "pass through", "chain", "forward", "through")
+_SWARM_WORDS = ("swarm", "codeforces", "agents")
+_CF_ID_RE = re.compile(r"\b(?:codeforces/)?\d+/[A-Za-z0-9]+\b")
+
+# Default swarm workload (must stay in sync with agent_swarm/problems.py).
+DEFAULT_CODEFORCES_IDS = [
+    "codeforces/409/F",
+    "codeforces/784/A",
+    "codeforces/952/A",
+    "codeforces/656/A",
+    "codeforces/1145/B",
+    "codeforces/656/D",
+    "codeforces/290/B",
+    "codeforces/784/D",
+    "codeforces/290/A",
+    "codeforces/171/B",
+]
+
+
+def _normalize_cf_id(raw: str) -> str:
+    return raw if raw.startswith("codeforces/") else f"codeforces/{raw}"
 
 
 @dataclass
@@ -198,9 +220,42 @@ class GraphBuilder:
             plan.append("Join the collected strings into one (StringJoin), wired from the array.")
             return join_id
 
+        wants_swarm = any(word in lowered for word in _SWARM_WORDS)
+        can_swarm = all(
+            self._has(node_type)
+            for node_type in (SWARM_SOLVER_NODE, SWARM_JOIN_NODE, ARRAY_NODE, ARRAY_APPEND_NODE)
+        )
+
+        def wire_swarm(problem_ids: List[str]) -> str:
+            # Fan out: one SwarmSolverNode (independent agent) per problem.
+            solver_ids = []
+            for problem_id in problem_ids:
+                solver_ids.append(
+                    add(SWARM_SOLVER_NODE, f"solve {problem_id}", {"problem_id": problem_id})
+                )
+            plan.append(f"Spawn {len(solver_ids)} agents (SwarmSolverNode), one per problem.")
+            # Collect their outputs into an array via a wired append chain.
+            array_id = add(ARRAY_NODE, "results", {})
+            current = array_id
+            for solver_id in solver_ids:
+                current = add(
+                    ARRAY_APPEND_NODE,
+                    "collect",
+                    {"array": edge(current), "element": edge(solver_id)},
+                )
+            plan.append("Collect each agent's result into an array (wired).")
+            # Fork-join into a single report.
+            join_id = add(SWARM_JOIN_NODE, "fork-join", {"results": edge(current)})
+            plan.append("Fork-join the agents' solutions into a report (SwarmJoinNode).")
+            return join_id
+
         source_id: Optional[str] = None
 
-        if literals and can_wire_join and (wants_join or len(literals) > 1):
+        if wants_swarm and can_swarm:
+            found = [_normalize_cf_id(m) for m in _CF_ID_RE.findall(text)]
+            problem_ids = found or list(DEFAULT_CODEFORCES_IDS)
+            source_id = wire_swarm(problem_ids)
+        elif literals and can_wire_join and (wants_join or len(literals) > 1):
             source_id = wire_join(literals)
         elif literals and self._has(STRING_NODE):
             source_id = add(STRING_NODE, "string", {"text": literals[0]})

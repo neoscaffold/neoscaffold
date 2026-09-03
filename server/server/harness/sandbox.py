@@ -8,6 +8,10 @@ changing node code. Timeouts are recorded as metrics.
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from dataclasses import dataclass
@@ -16,6 +20,7 @@ from typing import Any, Callable, Optional
 from . import observability
 
 DEFAULT_TIMEOUT_SECONDS = 30.0
+DEFAULT_CODE_TIMEOUT_SECONDS = 10.0
 
 
 @dataclass
@@ -76,3 +81,72 @@ def run_guarded(
         )
         executor.shutdown(wait=False)
         return GuardResult(ok=False, error=exc, duration_seconds=duration)
+
+
+@dataclass
+class CodeRunResult:
+    """Outcome of running a code snippet in a subprocess."""
+
+    ok: bool
+    stdout: str = ""
+    stderr: str = ""
+    returncode: Optional[int] = None
+    timed_out: bool = False
+    duration_seconds: float = 0.0
+
+
+def run_python_code(
+    code: str,
+    stdin: str = "",
+    *,
+    timeout: float = DEFAULT_CODE_TIMEOUT_SECONDS,
+    label: str = "agent_code",
+) -> CodeRunResult:
+    """Run agent-authored Python in a subprocess with a wall-clock timeout.
+
+    This is the first-step sandbox for verifying generated solutions (harness.md
+    §7): a fresh temp dir, captured stdout/stderr, and a hard timeout. It is not
+    a security boundary; the Docker/Cloudflare runner the seam targets is where
+    real isolation lands.
+    """
+    start = time.perf_counter()
+    with tempfile.TemporaryDirectory() as work_dir:
+        script_path = os.path.join(work_dir, "solution.py")
+        with open(script_path, "w", encoding="utf-8") as handle:
+            handle.write(code or "")
+        try:
+            proc = subprocess.run(
+                [sys.executable, script_path],
+                input=stdin,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=work_dir,
+            )
+            duration = time.perf_counter() - start
+            observability.observe(
+                "neoscaffold_code_run_seconds",
+                duration,
+                help="Duration of a sandboxed code run",
+                label=label,
+            )
+            return CodeRunResult(
+                ok=(proc.returncode == 0),
+                stdout=proc.stdout,
+                stderr=proc.stderr,
+                returncode=proc.returncode,
+                duration_seconds=duration,
+            )
+        except subprocess.TimeoutExpired as exc:
+            observability.inc(
+                "neoscaffold_code_run_timeouts_total",
+                help="Sandboxed code runs that timed out",
+                label=label,
+            )
+            return CodeRunResult(
+                ok=False,
+                stdout=exc.stdout or "" if isinstance(exc.stdout, str) else "",
+                stderr="timeout",
+                timed_out=True,
+                duration_seconds=time.perf_counter() - start,
+            )

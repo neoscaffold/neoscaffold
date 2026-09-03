@@ -129,16 +129,22 @@ def v1_routes(server):
             limit = int(raw_limit) if raw_limit is not None else 100
         except (TypeError, ValueError):
             limit = 100
-        return web.json_response({"events": AGENT_EVENTS.recent(limit)})
+        return web.json_response(
+            {
+                "events": AGENT_EVENTS.recent(limit),
+                "streams": AGENT_EVENTS.streams(),
+            }
+        )
 
-    # Bridge agent/subagent events to the WebSocket so the editor can show them
-    # live. Only the most recent server broadcasts (keeps tests clean).
+    # Bridge agent/subagent events + streams to the WebSocket so the editor can
+    # show them live. Only the most recent server broadcasts (keeps tests clean).
     AGENT_EVENTS.clear_subscribers()
 
-    def _broadcast_agent_event(event):
+    def _broadcast_agent_payload(payload):
         try:
-            server.send_sync("agent_event", event)
+            channel = "agent_stream" if payload.get("type") == "stream" else "agent_event"
+            server.send_sync(channel, payload)
         except Exception:
             pass
 
-    AGENT_EVENTS.subscribe(_broadcast_agent_event)
+    AGENT_EVENTS.subscribe(_broadcast_agent_payload)

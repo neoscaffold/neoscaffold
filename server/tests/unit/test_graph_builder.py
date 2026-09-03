@@ -68,6 +68,39 @@ def test_offline_multiple_literals_wire_even_without_join_word():
     assert "StringJoin" in types
 
 
+def test_offline_swarm_builds_fanout_and_join():
+    from custom_extensions.agent_swarm.extension import EXTENSION_MAPPINGS as SWARM
+
+    known = {**KNOWN, **SWARM["nodes"]}
+    result = build_graph(
+        "spawn a swarm of agents to solve codeforces/409/F codeforces/784/A codeforces/290/A",
+        known_nodes=known,
+    )
+    types = _types(result)
+    assert types.count("SwarmSolverNode") == 3
+    assert types.count("SwarmJoinNode") == 1
+    assert "nsArray" in types and types.count("nsArrayAppend") == 3
+    # join is wired from the collected array; a logger is wired from the join
+    join = next(n for n in result.prompt.values() if n["type"] == "SwarmJoinNode")
+    assert isinstance(join["inputs"]["results"], dict) and "originId" in join["inputs"]["results"]
+    # each solver carries its problem id
+    solver_ids = {
+        n["inputs"]["problem_id"]
+        for n in result.prompt.values()
+        if n["type"] == "SwarmSolverNode"
+    }
+    assert solver_ids == {"codeforces/409/F", "codeforces/784/A", "codeforces/290/A"}
+
+
+def test_offline_swarm_defaults_to_full_problem_set():
+    from custom_extensions.agent_swarm.extension import EXTENSION_MAPPINGS as SWARM
+
+    known = {**KNOWN, **SWARM["nodes"]}
+    result = build_graph("run the codeforces swarm", known_nodes=known)
+    types = _types(result)
+    assert types.count("SwarmSolverNode") == 10
+
+
 def test_offline_pipe_inserts_wired_passthrough():
     result = build_graph('log "x" through a passthrough', known_nodes=KNOWN)
     types = _types(result)
