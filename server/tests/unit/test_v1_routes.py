@@ -114,3 +114,57 @@ def test_build_graph_rejects_empty_prompt(loop):
             await client.close()
 
     _run(loop, go())
+
+
+def test_openapi_endpoint(loop):
+    server = _make_server_app()
+
+    async def go():
+        client = await _client(server)
+        try:
+            resp = await client.get("/v1/openapi.json")
+            assert resp.status == 200
+            spec = await resp.json()
+            assert spec["openapi"].startswith("3.")
+            assert "/v1/agent/build-graph" in spec["paths"]
+        finally:
+            await client.close()
+
+    _run(loop, go())
+
+
+def test_mcp_tools_endpoint(loop):
+    server = _make_server_app()
+
+    async def go():
+        client = await _client(server)
+        try:
+            resp = await client.get("/v1/mcp/tools")
+            assert resp.status == 200
+            body = await resp.json()
+            names = {t["name"] for t in body["tools"]}
+            assert "buildGraph" in names
+            assert "runPrompt" in names
+        finally:
+            await client.close()
+
+    _run(loop, go())
+
+
+def test_agent_events_endpoint_reflects_builds(loop):
+    server = _make_server_app()
+
+    async def go():
+        client = await _client(server)
+        try:
+            # trigger a build so at least one agent event exists
+            await client.post("/v1/agent/build-graph", json={"prompt": 'log "events"'})
+            resp = await client.get("/v1/agent/events?limit=50")
+            assert resp.status == 200
+            body = await resp.json()
+            kinds = [e["kind"] for e in body["events"]]
+            assert "graph_build" in kinds
+        finally:
+            await client.close()
+
+    _run(loop, go())

@@ -15,6 +15,19 @@ See ``harness.md`` and ``docs/ROADMAP_1.0.0.md``.
 
 version = "1.0.0"
 
+try:
+    from server.harness.agent_events import AGENT_EVENTS
+except Exception:  # keep the extension importable even if harness is unavailable
+    AGENT_EVENTS = None
+
+
+def _emit(kind, name, detail=None, status="succeeded"):
+    if AGENT_EVENTS is not None:
+        try:
+            AGENT_EVENTS.record(kind, name, status=status, detail=detail or {})
+        except Exception:
+            pass
+
 
 def offline_respond(prompt, input_value=None):
     """Deterministic, offline prompt responder.
@@ -77,7 +90,17 @@ class PromptNode:
         if "input" in optional:
             raw = optional.get("input", {}).get("values")
             input_value = raw if raw not in ("", None) else None
-        return RESPONDER(prompt, input_value)
+        output = RESPONDER(prompt, input_value)
+        _emit(
+            "prompt_node",
+            "PromptNode",
+            detail={
+                "prompt": prompt,
+                "has_input": input_value is not None,
+                "output_preview": str(output)[:200],
+            },
+        )
+        return output
 
 
 class BuildGraphNode:
@@ -114,6 +137,11 @@ class BuildGraphNode:
         if "prompt" in required:
             prompt = required.get("prompt", {}).get("values", "")
         result = build_graph(prompt)
+        _emit(
+            "build_graph_node",
+            "BuildGraphNode",
+            detail={"prompt": prompt, "nodes": len(result.prompt), "source": result.source},
+        )
         return result.to_dict()
 
 

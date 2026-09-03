@@ -13,6 +13,9 @@ from ...domain.services.graph_builder import GraphBuilder
 from ...domain.utilities.authorize_user_and_get_info import authorize_user_and_get_info
 from ...domain.utilities.fallback_json_encoder import dumps
 from ...harness import observability
+from ...harness.agent_events import AGENT_EVENTS
+from ...harness.openapi import build_openapi_spec
+from ...harness.openapi_mcp import OpenApiToolset
 from ...harness.parsing import ParseError
 
 VERSION = "1.0.0"
@@ -90,3 +93,35 @@ def v1_routes(server):
                 "rules": len(getattr(server, "rules", {})),
             }
         )
+
+    @routes.get("/v1/openapi.json")
+    async def openapi_route(request):
+        # The machine-readable contract other agents (and the MCP bridge) use.
+        return web.json_response(build_openapi_spec(server))
+
+    @routes.get("/v1/mcp/tools")
+    async def mcp_tools_route(request):
+        # MCP tool definitions derived from the OpenAPI spec.
+        toolset = OpenApiToolset(build_openapi_spec(server))
+        return web.json_response({"tools": toolset.tools()})
+
+    @routes.get("/v1/agent/events")
+    async def agent_events_route(request):
+        raw_limit = request.rel_url.query.get("limit")
+        try:
+            limit = int(raw_limit) if raw_limit is not None else 100
+        except (TypeError, ValueError):
+            limit = 100
+        return web.json_response({"events": AGENT_EVENTS.recent(limit)})
+
+    # Bridge agent/subagent events to the WebSocket so the editor can show them
+    # live. Only the most recent server broadcasts (keeps tests clean).
+    AGENT_EVENTS.clear_subscribers()
+
+    def _broadcast_agent_event(event):
+        try:
+            server.send_sync("agent_event", event)
+        except Exception:
+            pass
+
+    AGENT_EVENTS.subscribe(_broadcast_agent_event)

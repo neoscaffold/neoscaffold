@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from ...harness import observability
+from ...harness.agent_events import AGENT_EVENTS
 from ...harness.parsing import (
     GraphSpec,
     NodeContract,
@@ -92,10 +93,38 @@ class GraphBuilder:
         if not text:
             raise ParseError("prompt", "prompt must be a non-empty string")
 
-        if self.llm is not None:
-            result = self._build_with_llm(text)
-        else:
-            result = self._build_offline(text)
+        # Open a subagent span so users can watch the build happen.
+        event_id = AGENT_EVENTS.start(
+            "graph_build", text[:80], detail={"prompt": text, "planner": "llm" if self.llm else "offline"}
+        )
+        try:
+            if self.llm is not None:
+                result = self._build_with_llm(text)
+            else:
+                result = self._build_offline(text)
+        except Exception as exc:
+            AGENT_EVENTS.finish(event_id, status="failed", detail={"error": str(exc)})
+            raise
+
+        # Child spans: each generated node is a scoped unit of work.
+        for node_id, node_spec in result.spec.nodes.items():
+            AGENT_EVENTS.record(
+                "node",
+                node_spec.type,
+                parent_id=event_id,
+                detail={"node_id": node_id, "name": node_spec.name},
+            )
+
+        AGENT_EVENTS.finish(
+            event_id,
+            status="succeeded",
+            detail={
+                "source": result.source,
+                "nodes": len(result.spec.nodes),
+                "plan": result.plan,
+                "warnings": result.warnings,
+            },
+        )
 
         observability.inc(
             "neoscaffold_graph_build_total",
