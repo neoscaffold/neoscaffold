@@ -244,7 +244,43 @@ the agent and the reviewer the evidence to decide.
 
 ---
 
-## 10. What the harness deliberately does not do
+## 10. Control surface: OpenAPI + MCP
+
+NeoScaffold is meant to be driven by other agents, not just humans. The control
+surface is defined once as an **OpenAPI 3.1 spec** (`server/server/harness/openapi.py`,
+served at `GET /v1/openapi.json`, static copy in `docs/openapi.json`) and exposed
+to agents through the **Model Context Protocol**:
+
+- `server/server/harness/openapi_mcp.py` converts each OpenAPI operation (with an
+  `operationId`) into an MCP tool (`name`, `description`, JSON-Schema `inputSchema`)
+  and resolves a tool call back into a concrete HTTP request.
+- `server/server/harness/mcp.py` implements the MCP JSON-RPC subset a tools server
+  needs (`initialize`, `tools/list`, `tools/call`, `ping`), dependency-free.
+- `server/mcp_server.py` is the runnable stdio server that proxies tool calls to
+  the HTTP API. `GET /v1/mcp/tools` exposes the derived tool list for introspection.
+
+Because tools are derived from the spec, **adding an operation to the OpenAPI
+document makes it agent-callable automatically** — the spec is the one boundary
+to defend. See `docs/MCP.md`.
+
+## 11. Subagent visibility
+
+Users and agents can see inside the swarm. `server/server/harness/agent_events.py`
+records span-like events (`id`, `parent_id`, `kind`, `name`, `status`, timings,
+`detail`) in a bounded, thread-safe log with live subscribers:
+
+- The graph builder opens a `graph_build` span and records a child `node` span per
+  generated node (parent → child shows agents spinning up agents). `PromptNode`
+  and `BuildGraphNode` record their own events.
+- `GET /v1/agent/events?limit=` returns recent events; new events are also
+  broadcast over the existing WebSocket (`agent_event`) for live UI updates.
+- The editor's **Agent Activity** panel renders these spans so a user watches the
+  subagents work in real time.
+
+This complements the metrics/logs/traces in §5: metrics answer "how much / how
+fast", the event log answers "what is each subagent doing right now".
+
+## 12. What the harness deliberately does not do
 
 - It does not re-validate typed structures after the edge parse.
 - It does not hard-fail on style or on soft constraints; those are warnings.

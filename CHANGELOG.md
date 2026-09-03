@@ -2,6 +2,9 @@
 
 ## 1.0.0 - 2026-09-02
 
+- Added an OpenAPI 3.1 contract (`GET /v1/openapi.json`, `docs/openapi.json`) as the single source of truth for the API.
+- Added an MCP interface derived from the OpenAPI spec so other agents can control NeoScaffold: an OpenAPI→MCP tool converter, `GET /v1/mcp/tools`, and a runnable stdio MCP server (`server/mcp_server.py`) implementing `initialize`/`tools/list`/`tools/call` (see `docs/MCP.md`).
+- Added subagent visibility: an agent/subagent event log (`server/server/harness/agent_events.py`), instrumentation of the graph builder (parent build span + per-node child spans) and `PromptNode`/`BuildGraphNode`, `GET /v1/agent/events`, live WebSocket broadcast, and an editor **Agent Activity** panel.
 - Added the engineering harness (`harness.md`): typed boundaries, parse-over-validate, system lints, observability, and a sandbox seam.
 - Added `server/server/harness/`: `parsing` (typed `GraphSpec`/`NodeSpec` parse boundary + kind lattice), `observability` (dependency-free Prometheus metrics + structured JSON logs), `lint` (architecture lint CLI, `python -m server.harness.lint`), and `sandbox` (`run_guarded` timeout seam).
 - Added agent-generated graph topology: `graph_builder` turns natural language into a validated prompt-graph (offline deterministic planner by default; optional LLM planner whose output is parsed, repaired, or rejected).

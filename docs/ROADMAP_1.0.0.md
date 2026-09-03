@@ -71,10 +71,21 @@ New service:
 New HTTP surface (`server/server/infrastructure/apis/v1_routes.py`, registered from
 `Server.add_routes`), additive and versioned:
 
-- `POST /v1/agent/build-graph` — `{prompt}` → `{prompt, workflow, spec, warnings}`
+- `POST /v1/agent/build-graph` — `{prompt}` → `{prompt, layout, plan, warnings}`
   ready to import into the editor.
 - `GET /v1/metrics` — Prometheus exposition (PromQL).
 - `GET /v1/healthz` — liveness + loaded node/extension counts.
+- `GET /v1/openapi.json` — the machine-readable API contract.
+- `GET /v1/mcp/tools` — MCP tool definitions derived from the OpenAPI spec.
+- `GET /v1/agent/events` — recent subagent activity for the visibility panel.
+
+Control + visibility (so other agents can drive NeoScaffold and users can watch):
+
+- `server/server/harness/openapi.py` — OpenAPI 3.1 spec (single source of truth).
+- `server/server/harness/openapi_mcp.py` + `mcp.py` + `server/mcp_server.py` — an
+  MCP tools server derived from the spec (see `docs/MCP.md`).
+- `server/server/harness/agent_events.py` — the subagent event log, broadcast over
+  WebSocket and exposed at `/v1/agent/events`.
 
 Executor instrumentation: `run_sequential` / `run_parallel` emit metrics
 (graph runs, nodes executed, failures, duration) and structured logs via the
@@ -94,7 +105,10 @@ lint/type/test are reproducible.
 - **`app/components/neo-prompt-bar/`** — the natural-language entry point: a text
   box above the editor canvas that sends intent to the service and inserts the
   generated graph. Mounted in `templates/workflow.hbs`.
-- Tests: a unit test for the service and an integration test for the component
+- **`app/components/neo-agent-activity/`** — the subagent visibility panel; polls
+  `/v1/agent/events` and renders build spans with their per-node child spans so a
+  user can watch the swarm work.
+- Tests: a unit test for the service and integration tests for the components
   (backend mocked), plus manual GUI verification.
 
 ---
