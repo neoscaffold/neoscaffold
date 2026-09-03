@@ -185,6 +185,29 @@
       return body;
     },
 
+    // v1 agent API: build a graph from natural language.
+    async buildGraphFromPrompt(promptText) {
+      const authorizationHeaders = await this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+      const response = await fetch(`${this.baseURL}/v1/agent/build-graph`, {
+        method: 'POST',
+        headers: authorizationHeaders,
+        body: JSON.stringify({ prompt: promptText }),
+      });
+      return this.parseJsonResponse(response);
+    },
+
+    // v1 agent API: recent subagent events + per-node live streams.
+    async fetchAgentActivity(limit = 100) {
+      const authorizationHeaders = await this.getAuthorizationHeaders();
+      const response = await fetch(
+        `${this.baseURL}/v1/agent/events?limit=${encodeURIComponent(limit)}`,
+        { method: 'GET', headers: authorizationHeaders },
+      );
+      const body = await this.parseJsonResponse(response);
+      return { events: body.events || [], streams: Object.values(body.streams || {}) };
+    },
+
     async queuePrompt(prompt) {
       // check if prompt is valid json
       try {
@@ -1092,6 +1115,8 @@
       scope.addSideMenuOptions(canvas);
       scope.addRuntimeButtons(canvas);
       scope.addZoomControls(canvas);
+      scope.addPromptBar(canvas);
+      scope.addAgentActivityPanel(canvas);
       scope.enableMultiNodeDragging(canvas);
       scope.addKeyboardShortcuts(canvas);
 
@@ -2337,6 +2362,10 @@
       // Remove all listeners
       window.removeEventListener('resize', this._resizeHandler);
       window.removeEventListener('mouseup', this._mouseupHandler);
+      if (this._agentActivityTimer) {
+        clearInterval(this._agentActivityTimer);
+        this._agentActivityTimer = null;
+      }
       if (this.runningProgressTimer) {
         clearInterval(this.runningProgressTimer);
         this.runningProgressTimer = null;
@@ -3367,6 +3396,223 @@
       this.updateToolbarPosition(canvas);
 
       return toolbar;
+    },
+
+    /**
+     * Natural-language entry point (portable, self-contained): a prompt bar above
+     * the canvas that asks the backend to build a validated graph and inserts it.
+     */
+    addPromptBar(canvas) {
+      const scope = this;
+      const container = canvas.canvas.parentElement;
+      if (window.getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+      }
+
+      const bar = document.createElement('div');
+      bar.classList.add('neo-prompt-bar');
+      bar.setAttribute('data-test-prompt-bar', '');
+
+      const form = document.createElement('form');
+      form.classList.add('npb-form');
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.classList.add('npb-input');
+      input.placeholder =
+        'Describe a workflow, e.g. concatenate "hello" and "world" then log it';
+      input.setAttribute('data-test-prompt-input', '');
+
+      const button = document.createElement('button');
+      button.type = 'submit';
+      button.classList.add('npb-submit');
+      button.textContent = 'Generate';
+      button.setAttribute('data-test-prompt-submit', '');
+
+      const result = document.createElement('div');
+      result.classList.add('npb-result');
+      result.style.display = 'none';
+
+      form.appendChild(input);
+      form.appendChild(button);
+      bar.appendChild(form);
+      bar.appendChild(result);
+      container.appendChild(bar);
+
+      const setBuilding = (building) => {
+        button.disabled = building;
+        input.disabled = building;
+        button.textContent = building ? 'Building…' : 'Generate';
+      };
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const text = (input.value || '').trim();
+        if (!text) {
+          return;
+        }
+        setBuilding(true);
+        result.style.display = 'none';
+        result.classList.remove('npb-error');
+        try {
+          const build = await scope.api.buildGraphFromPrompt(text);
+          const created = scope.importPromptGraph(build);
+          result.innerHTML = '';
+          const summary = document.createElement('div');
+          summary.classList.add('npb-summary');
+          summary.textContent = `Added ${created} node(s) (${build.source || ''})`;
+          result.appendChild(summary);
+          if ((build.plan || []).length) {
+            const list = document.createElement('ol');
+            list.classList.add('npb-plan');
+            build.plan.forEach((step) => {
+              const item = document.createElement('li');
+              item.textContent = step;
+              list.appendChild(item);
+            });
+            result.appendChild(list);
+          }
+          result.style.display = 'block';
+        } catch (error) {
+          result.innerHTML = '';
+          result.textContent = error.message || 'Failed to build graph';
+          result.classList.add('npb-error');
+          result.setAttribute('data-test-prompt-error', '');
+          result.style.display = 'block';
+        } finally {
+          setBuilding(false);
+        }
+      });
+
+      this.promptBarElement = bar;
+      return bar;
+    },
+
+    /**
+     * Subagent visibility panel (portable, self-contained): shows recent agent
+     * events and each agent's live output stream, scoped to its node. Polls the
+     * backend while mounted.
+     */
+    addAgentActivityPanel(canvas) {
+      const scope = this;
+      const container = canvas.canvas.parentElement;
+
+      const panel = document.createElement('div');
+      panel.classList.add('neo-agent-activity');
+      panel.setAttribute('data-test-agent-activity', '');
+
+      const header = document.createElement('div');
+      header.classList.add('npa-header');
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.classList.add('npa-toggle');
+      toggle.setAttribute('data-test-agent-toggle', '');
+      const refresh = document.createElement('button');
+      refresh.type = 'button';
+      refresh.classList.add('npa-refresh');
+      refresh.textContent = 'Refresh';
+      header.appendChild(toggle);
+      header.appendChild(refresh);
+
+      const body = document.createElement('div');
+      body.classList.add('npa-body');
+      body.setAttribute('data-test-agent-body', '');
+
+      panel.appendChild(header);
+      panel.appendChild(body);
+      container.appendChild(panel);
+
+      const state = { open: true, events: [], streams: [] };
+
+      const render = () => {
+        toggle.textContent = `${state.open ? '▾' : '▸'} Agent Activity (${state.events.length})`;
+        body.style.display = state.open ? 'block' : 'none';
+        if (!state.open) {
+          return;
+        }
+        body.innerHTML = '';
+
+        if (state.streams.length) {
+          const title = document.createElement('div');
+          title.className = 'npa-section-title';
+          title.textContent = 'Live agent streams';
+          body.appendChild(title);
+          state.streams.forEach((stream) => {
+            const details = document.createElement('details');
+            details.className = 'npa-stream';
+            details.open = true;
+            details.setAttribute('data-test-agent-stream', '');
+            const summary = document.createElement('summary');
+            summary.className = 'npa-stream-name';
+            summary.textContent = stream.name || stream.node_id;
+            const pre = document.createElement('pre');
+            pre.className = 'npa-stream-text';
+            pre.textContent = stream.text || '';
+            details.appendChild(summary);
+            details.appendChild(pre);
+            body.appendChild(details);
+          });
+        }
+
+        if (state.events.length) {
+          const title = document.createElement('div');
+          title.className = 'npa-section-title';
+          title.textContent = 'Events';
+          body.appendChild(title);
+          const list = document.createElement('ul');
+          list.className = 'npa-list';
+          state.events.forEach((eventItem) => {
+            const item = document.createElement('li');
+            item.className = `npa-event npa-${eventItem.status} npa-kind-${eventItem.kind}`;
+            item.setAttribute('data-test-agent-event', '');
+            const status = document.createElement('span');
+            status.className = 'npa-status';
+            status.textContent = eventItem.status;
+            const kind = document.createElement('span');
+            kind.className = 'npa-kind';
+            kind.textContent = eventItem.kind;
+            const name = document.createElement('span');
+            name.className = 'npa-name';
+            name.textContent = eventItem.name;
+            item.appendChild(status);
+            item.appendChild(kind);
+            item.appendChild(name);
+            list.appendChild(item);
+          });
+          body.appendChild(list);
+        } else if (!state.streams.length) {
+          const empty = document.createElement('div');
+          empty.className = 'npa-empty';
+          empty.textContent = 'No agent activity yet. Generate a graph to see subagents.';
+          body.appendChild(empty);
+        }
+      };
+
+      const refreshData = async () => {
+        try {
+          const { events, streams } = await scope.api.fetchAgentActivity(100);
+          state.events = events.slice().reverse();
+          state.streams = streams;
+          render();
+        } catch (error) {
+          // keep the last rendered state on transient failures
+        }
+      };
+
+      toggle.addEventListener('click', () => {
+        state.open = !state.open;
+        render();
+      });
+      refresh.addEventListener('click', refreshData);
+
+      render();
+      refreshData();
+      if (this._agentActivityTimer) {
+        clearInterval(this._agentActivityTimer);
+      }
+      this._agentActivityTimer = setInterval(refreshData, 2000);
+      this.agentActivityElement = panel;
+      return panel;
     },
 
     zoomCanvas(canvas, zoomMultiplier) {
