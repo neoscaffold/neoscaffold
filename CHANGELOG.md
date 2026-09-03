@@ -2,6 +2,7 @@
 
 ## 1.0.0 - 2026-09-02
 
+- Improved the natural-language graph builder to generate real node-to-node wiring: concatenation now builds an `nsString` per literal wired through an `nsArrayAppend` chain into `StringJoin` (edges, not literal arrays), pipe/pass-through phrasing inserts a wired `PassThrough`, and every result is wired into the logger. Added a two-row layout so wiring reads clearly, and the editor now auto fits-to-view after inserting a generated graph.
 - Added an OpenAPI 3.1 contract (`GET /v1/openapi.json`, `docs/openapi.json`) as the single source of truth for the API.
 - Added an MCP interface derived from the OpenAPI spec so other agents can control NeoScaffold: an OpenAPI→MCP tool converter, `GET /v1/mcp/tools`, and a runnable stdio MCP server (`server/mcp_server.py`) implementing `initialize`/`tools/list`/`tools/call` (see `docs/MCP.md`).
 - Added subagent visibility: an agent/subagent event log (`server/server/harness/agent_events.py`), instrumentation of the graph builder (parent build span + per-node child spans) and `PromptNode`/`BuildGraphNode`, `GET /v1/agent/events`, live WebSocket broadcast, and an editor **Agent Activity** panel.
