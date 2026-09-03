@@ -9,7 +9,7 @@ Additive, backward-compatible routes:
 
 from aiohttp import web
 
-from ...domain.services.graph_builder import GraphBuilder
+from ...domain.services.graph_builder import GraphBuilder, make_openai_planner
 from ...domain.utilities.authorize_user_and_get_info import authorize_user_and_get_info
 from ...domain.utilities.fallback_json_encoder import dumps
 from ...harness import observability
@@ -34,7 +34,17 @@ def _authorized_user(request):
 
 # Node types that are pure sources/leaves; placed on an upper row so the wiring
 # into the main pipeline row reads clearly.
-_SOURCE_NODE_TYPES = {"nsString", "nsArray", "nsInteger", "nsFloat", "nsBoolean"}
+_SOURCE_NODE_TYPES = {
+    "nsString",
+    "nsArray",
+    "nsInteger",
+    "nsFloat",
+    "nsBoolean",
+    "CerebrasAgent",
+    "CerebrasAgentAsync",
+    "PromptNode",
+    "SwarmSolverNode",
+}
 
 
 def _layout(prompt):
@@ -77,7 +87,11 @@ def v1_routes(server):
                 {"error": "'prompt' must be a non-empty string"}, status=400
             )
 
-        builder = GraphBuilder(known_nodes=getattr(server, "nodes", {}))
+        known_nodes = getattr(server, "nodes", {})
+        builder = GraphBuilder(
+            known_nodes=known_nodes,
+            llm=make_openai_planner(known_nodes),
+        )
         try:
             result = builder.build(prompt_text)
         except ParseError as exc:

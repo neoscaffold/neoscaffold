@@ -17,9 +17,11 @@ from .parsing import (
     ParseError,
     contract_from_python_class,
     contracts_from_nodes,
+    edge_count,
     is_assignable,
     lint_graph,
     parse_graph,
+    repair_connectivity,
 )
 
 __all__ = [
@@ -31,7 +33,9 @@ __all__ = [
     "ParseError",
     "contract_from_python_class",
     "contracts_from_nodes",
+    "edge_count",
     "is_assignable",
     "lint_graph",
     "parse_graph",
+    "repair_connectivity",
 ]

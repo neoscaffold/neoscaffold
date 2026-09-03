@@ -124,7 +124,10 @@ NL prompt ──▶ Planner ──▶ GraphSpec (typed) ──▶ parse_graph �
 - **LLM planner** (optional): when a key is present, the LLM proposes a graph as
   JSON which is then run through `parse_graph`. The harness trusts the *parser*,
   never the model: an invalid proposal is repaired or rejected (§6), never
-  executed blindly.
+  executed blindly. A proposal that parses but is **disconnected** (no
+  `originId` wires) is still repaired: unused producers are wired into unwired
+  required dataflow inputs, and empty `prompt` literals are filled from the
+  user's request. Credential fields (`api_key`, …) are never invented.
 
 Every builder result is parsed before it leaves the service, so the endpoint and
 the editor only ever receive graphs that already satisfy §1–§2.
@@ -184,6 +187,7 @@ policy:
 | Situation | Action |
 | --- | --- |
 | Structurally invalid (fails `parse_graph`) and cheaply fixable | **Repair** (drop dangling edges, coerce assignable kinds) then re-parse |
+| Multi-node graph with no wires, or empty `prompt`/`text` literals | **Repair** (wire unused producers into unwired required dataflow inputs in id order; fill empty prompt literals from the user request). Never invents nodes or credentials. |
 | Structurally invalid and not cheaply fixable | **Reject** with a `ParseError` describing the exact `path` |
 | Parses but violates a defended constraint (unsafe node, missing sandbox) | **Escalate** to a human with the failing constraint attached |
 | Parses and only trips a *warning* | **Proceed**, attach the warning to context |

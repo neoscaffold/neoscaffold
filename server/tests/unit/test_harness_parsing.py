@@ -194,3 +194,87 @@ def test_lint_graph_clean_when_valid():
     contracts = contracts_from_nodes(NODES)
     spec = parse_graph(simple_prompt(), contracts=contracts)
     assert lint_graph(spec, contracts) == []
+
+
+def test_lint_graph_warns_disconnected_multi_node_graph():
+    contracts = contracts_from_nodes(NODES)
+    spec = parse_graph(
+        {
+            "1": {"type": "nsString", "inputs": {"text": "a"}},
+            "2": {"type": "ConsoleLog", "inputs": {}},
+        },
+        contracts=contracts,
+    )
+    warnings = lint_graph(spec, contracts)
+    assert any("no wires" in w for w in warnings)
+
+
+def test_lint_graph_warns_empty_required_literal():
+    contracts = contracts_from_nodes(NODES)
+    spec = parse_graph(
+        {"1": {"type": "nsString", "inputs": {"text": ""}}},
+        contracts=contracts,
+    )
+    warnings = lint_graph(spec, contracts)
+    assert any("text" in w and "empty" in w for w in warnings)
+
+
+def test_repair_connectivity_wires_islands_in_id_order():
+    from server.harness.parsing import repair_connectivity
+
+    class FakeConcat:
+        INPUT = {
+            "required_inputs": {
+                "a": {"kind": "*", "name": "a"},
+                "b": {"kind": "*", "name": "b"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    nodes = {
+        **NODES,
+        "ConcatString": {"python_class": FakeConcat},
+    }
+    contracts = contracts_from_nodes(nodes)
+    payload = {
+        "1": {"type": "nsString", "name": "a", "inputs": {"text": "hello"}},
+        "2": {"type": "nsString", "name": "b", "inputs": {"text": "world"}},
+        "3": {"type": "ConcatString", "name": "join", "inputs": {}},
+        "4": {"type": "ConsoleLog", "name": "log", "inputs": {}},
+    }
+    repaired, repairs = repair_connectivity(payload, contracts=contracts)
+    assert repaired["3"]["inputs"]["a"] == {"originId": "1"}
+    assert repaired["3"]["inputs"]["b"] == {"originId": "2"}
+    assert repaired["4"]["inputs"]["any"] == {"originId": "3"}
+    assert any("wired" in r for r in repairs)
+    spec = parse_graph(repaired, contracts=contracts)
+    assert lint_graph(spec, contracts) == []
+
+
+def test_repair_connectivity_fills_empty_prompts_from_user_intent():
+    from server.harness.parsing import repair_connectivity
+
+    class FakeAgent:
+        INPUT = {
+            "required_inputs": {
+                "api_key": {"kind": "string", "name": "api_key"},
+                "prompt": {"kind": "string", "name": "prompt"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    nodes = {**NODES, "CerebrasAgent": {"python_class": FakeAgent}}
+    contracts = contracts_from_nodes(nodes)
+    payload = {
+        "1": {"type": "CerebrasAgent", "inputs": {}},
+        "2": {"type": "CerebrasAgent", "inputs": {}},
+    }
+    repaired, repairs = repair_connectivity(
+        payload,
+        contracts=contracts,
+        user_prompt="describe painting ideas",
+    )
+    assert repaired["1"]["inputs"]["prompt"] == "describe painting ideas (agent 1)"
+    assert repaired["2"]["inputs"]["prompt"] == "describe painting ideas (agent 2)"
+    assert "api_key" not in repaired["1"]["inputs"]
+    assert any("filled" in r for r in repairs)

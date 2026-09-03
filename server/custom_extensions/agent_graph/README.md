@@ -29,7 +29,13 @@ Turns a natural-language prompt into a validated NeoScaffold sub-graph — the
 - **Output:** `object` (a graph spec: `{prompt, plan, warnings, repairs, source}`).
 - **Behavior:** delegates to `server.domain.services.graph_builder.build_graph`,
   which always returns a graph that passes the parse boundary
-  (`server.harness.parsing`).
+  (`server.harness.parsing`). With `OPENAI_API_KEY` set, the HTTP prompt bar /
+  `POST /v1/agent/build-graph` path uses an OpenAI planner (override model with
+  `NEOSCAFFOLD_GRAPH_MODEL`; force offline with `NEOSCAFFOLD_GRAPH_OFFLINE=1`).
+  Invalid model output is repaired or rejected, then falls back to the offline
+  planner. After parse, the harness also repairs **disconnected** graphs: it
+  fills empty `prompt` literals from the user request and wires unused outputs
+  into unwired required dataflow inputs (never inventing nodes or API keys).
 
 ## Reliability
 

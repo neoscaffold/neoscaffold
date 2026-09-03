@@ -11,6 +11,7 @@ LLM planner may be injected; its output is always run through the parse boundary
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -25,7 +26,10 @@ from ...harness.parsing import (
     contracts_from_nodes,
     lint_graph,
     parse_graph,
+    repair_connectivity,
 )
+
+DEFAULT_GRAPH_MODEL = os.environ.get("NEOSCAFFOLD_GRAPH_MODEL", "gpt-4o-mini")
 
 # Node types the offline planner composes from. All are provided by the core /
 # network_requests extensions that ship with NeoScaffold.
@@ -310,21 +314,36 @@ class GraphBuilder:
             raw = raw["prompt"]
 
         repairs: List[str] = []
+        first_error: Optional[ParseError] = None
         try:
-            spec = parse_graph(raw, contracts=self.contracts)
-        except ParseError as first_error:
-            repaired, repairs = repair_graph(raw, contracts=self.contracts)
-            try:
-                spec = parse_graph(repaired, contracts=self.contracts)
-                repairs.append(f"repaired after: {first_error}")
-            except ParseError:
-                observability.inc(
-                    "neoscaffold_graph_build_rejected_total", reason="llm_invalid"
-                )
-                fallback = self._build_offline(text)
-                fallback.repairs.append(f"LLM graph invalid ({first_error}); used offline planner")
-                fallback.source = "offline_fallback"
-                return fallback
+            parse_graph(raw, contracts=self.contracts)
+        except ParseError as exc:
+            first_error = exc
+            observability.inc(
+                "neoscaffold_graph_build_rejected_total", reason="llm_parse"
+            )
+
+        candidate, drop_repairs = repair_graph(raw, contracts=self.contracts)
+        repairs.extend(drop_repairs)
+        candidate, conn_repairs = repair_connectivity(
+            candidate, contracts=self.contracts, user_prompt=text
+        )
+        repairs.extend(conn_repairs)
+        if first_error is not None and drop_repairs:
+            repairs.append(f"repaired after: {first_error}")
+
+        try:
+            spec = parse_graph(candidate, contracts=self.contracts)
+        except ParseError as exc:
+            observability.inc(
+                "neoscaffold_graph_build_rejected_total", reason="llm_invalid"
+            )
+            fallback = self._build_offline(text)
+            fallback.repairs.append(
+                f"LLM graph invalid ({first_error or exc}); used offline planner"
+            )
+            fallback.source = "offline_fallback"
+            return fallback
 
         if not spec.nodes:
             observability.inc("neoscaffold_graph_build_rejected_total", reason="llm_empty")
@@ -334,10 +353,13 @@ class GraphBuilder:
             return fallback
 
         warnings = lint_graph(spec, self.contracts) if self.contracts else []
+        plan = ["Graph proposed by LLM, parsed and accepted."]
+        if conn_repairs:
+            plan.append("Harness wired disconnected nodes and filled empty prompts.")
         return BuildResult(
             spec=spec,
             prompt=spec.to_prompt(),
-            plan=["Graph proposed by LLM, parsed and accepted."],
+            plan=plan,
             warnings=warnings,
             repairs=repairs,
             source="llm",
@@ -396,3 +418,122 @@ def build_graph(
 ) -> BuildResult:
     """Convenience wrapper around :class:`GraphBuilder`."""
     return GraphBuilder(known_nodes=known_nodes, llm=llm).build(prompt)
+
+
+_PREFERRED_PLANNER_TYPES = (
+    "PromptNode",
+    "BuildGraphNode",
+    "CerebrasAgent",
+    "CerebrasAgentAsync",
+    "SwarmSolverNode",
+    "SwarmJoinNode",
+    "nsString",
+    "ConcatString",
+    "StringJoin",
+    "ConsoleLog",
+    "PassThrough",
+    "nsArray",
+    "nsArrayAppend",
+)
+
+
+def _registration_class(registration: Any) -> Any:
+    if isinstance(registration, dict):
+        return registration.get("python_class")
+    return registration
+
+
+def _contract_line(name: str, cls: Any) -> str:
+    inputs = getattr(cls, "INPUT", {}) or {}
+    required = list((inputs.get("required_inputs") or {}).keys())
+    optional = list((inputs.get("optional_inputs") or {}).keys())
+    description = (getattr(cls, "DESCRIPTION", "") or "").strip()
+    parts = []
+    if required:
+        parts.append("in " + ", ".join(required))
+    if optional:
+        parts.append("opt " + ", ".join(optional))
+    signature = "; ".join(parts)
+    desc = f" — {description}" if description else ""
+    if signature:
+        return f"- {name}: {signature}{desc}"
+    return f"- {name}{desc}"
+
+
+def _planner_prompt(known_nodes: Optional[Mapping[str, Any]]) -> str:
+    """System prompt listing node types the model may emit."""
+    registry = known_nodes or {}
+    detailed: List[str] = []
+    seen = set()
+    for name in _PREFERRED_PLANNER_TYPES:
+        cls = _registration_class(registry.get(name))
+        if cls is None:
+            continue
+        detailed.append(_contract_line(name, cls))
+        seen.add(name)
+    other_names = sorted(n for n in registry if n not in seen)
+    others = ", ".join(other_names) if other_names else "(none)"
+    palette = "\n".join(detailed) if detailed else "- nsString: in text\n- ConsoleLog: in any"
+
+    return (
+        "You are NeoScaffold's graph planner. Convert the user's natural-language "
+        "workflow request into a JSON prompt-graph that is fully wired and runnable.\n\n"
+        "Return ONLY valid JSON (no markdown fences). Shape:\n"
+        '  {"<id>": {"type": "<NodeType>", "name": "...", "inputs": {...}}, ...}\n'
+        'or wrapped as {"prompt": { ... same object ... }}.\n\n'
+        "Rules:\n"
+        "- Node ids are unique string keys (\"1\", \"2\", ...).\n"
+        "- EVERY dataflow input MUST be wired with "
+        '{"originId": "<source_node_id>"}. Never leave combiners or logs unwired.\n'
+        "- Fill agent/node `prompt` (and `text`) with a concrete string derived "
+        "from the user's request. Distinct agents get distinct prompts.\n"
+        "- Do not invent api_key values; omit them or leave them empty.\n"
+        "- Prefer a small DAG that ends in ConsoleLog.\n"
+        "- Two agents whose results are combined MUST look like this pattern:\n"
+        "  CerebrasAgent/PromptNode -> ConcatString.a / ConcatString.b -> ConsoleLog.any\n"
+        "- Only use node types from this palette (preferred, with contracts):\n"
+        f"{palette}\n"
+        f"Other allowed types (name only): {others}\n"
+    )
+
+
+def make_openai_planner(
+    known_nodes: Optional[Mapping[str, Any]] = None,
+    *,
+    model: Optional[str] = None,
+) -> Optional[Callable[[str], Any]]:
+    """Return an OpenAI-backed planner when a key is configured, else ``None``.
+
+    Controlled by env:
+    - ``OPENAI_API_KEY`` — enables the live planner
+    - ``NEOSCAFFOLD_GRAPH_MODEL`` — model id (default ``gpt-4o-mini``)
+    - ``NEOSCAFFOLD_GRAPH_OFFLINE=1`` — force the offline planner even if a key is set
+    """
+    offline_forced = os.environ.get("NEOSCAFFOLD_GRAPH_OFFLINE", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if offline_forced or not os.environ.get("OPENAI_API_KEY"):
+        return None
+
+    chosen_model = model or DEFAULT_GRAPH_MODEL
+    system = _planner_prompt(known_nodes)
+
+    def planner(user_prompt: str) -> Any:
+        from openai import OpenAI
+
+        client = OpenAI()
+        response = client.chat.completions.create(
+            model=chosen_model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+        content = response.choices[0].message.content or "{}"
+        return content
+
+    return planner

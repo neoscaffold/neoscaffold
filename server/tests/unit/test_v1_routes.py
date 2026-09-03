@@ -1,6 +1,7 @@
 """Integration tests for the v1 HTTP routes using an aiohttp test client."""
 
 import asyncio
+import os
 from argparse import Namespace
 
 import pytest
@@ -8,6 +9,9 @@ from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 from server.infrastructure.servers.server import Server
+
+# Keep build-graph deterministic in CI even if OPENAI_API_KEY is present.
+os.environ["NEOSCAFFOLD_GRAPH_OFFLINE"] = "1"
 
 
 def _make_server_app():

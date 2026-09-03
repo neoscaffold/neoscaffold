@@ -175,6 +175,77 @@ def test_llm_non_json_string_falls_back_to_offline():
     assert result.source == "offline_fallback"
 
 
+def test_llm_disconnected_graph_is_wired_by_harness():
+    islands = {
+        "1": {"type": "nsString", "name": "a", "inputs": {"text": "hello"}},
+        "2": {"type": "nsString", "name": "b", "inputs": {"text": "world"}},
+        "3": {"type": "ConcatString", "name": "join", "inputs": {}},
+        "4": {"type": "ConsoleLog", "name": "log", "inputs": {}},
+    }
+    result = build_graph("combine two strings", known_nodes=KNOWN, llm=lambda p: islands)
+    assert result.source == "llm"
+    join = next(n for n in result.prompt.values() if n["type"] == "ConcatString")
+    log = next(n for n in result.prompt.values() if n["type"] == "ConsoleLog")
+    assert _is_edge(join["inputs"]["a"])
+    assert _is_edge(join["inputs"]["b"])
+    assert _is_edge(log["inputs"]["any"])
+    assert any("wired" in r for r in result.repairs)
+
+
+def test_llm_empty_agent_prompts_are_filled():
+    from custom_extensions.agents.extension import EXTENSION_MAPPINGS as AGENTS
+
+    known = {**KNOWN, **AGENTS["nodes"]}
+    islands = {
+        "1": {"type": "CerebrasAgent", "name": "a", "inputs": {}},
+        "2": {"type": "CerebrasAgent", "name": "b", "inputs": {}},
+        "3": {"type": "ConcatString", "name": "join", "inputs": {}},
+        "4": {"type": "ConsoleLog", "name": "log", "inputs": {}},
+    }
+    intent = "make two ai agents describe ideas for paintings and then combine them into one."
+    result = build_graph(intent, known_nodes=known, llm=lambda p: islands)
+    assert result.source == "llm"
+    agents = [n for n in result.prompt.values() if n["type"] == "CerebrasAgent"]
+    assert len(agents) == 2
+    assert all(n["inputs"].get("prompt") for n in agents)
+    join = next(n for n in result.prompt.values() if n["type"] == "ConcatString")
+    assert _is_edge(join["inputs"]["a"]) and _is_edge(join["inputs"]["b"])
+
+
+def test_planner_prompt_includes_registration_contracts():
+    from server.domain.services.graph_builder import _planner_prompt
+
+    text = _planner_prompt(KNOWN)
+    assert "ConcatString:" in text
+    assert "in a, b" in text
+    assert "originId" in text
+
+
+def test_make_openai_planner_none_without_key(monkeypatch):
+    from server.domain.services.graph_builder import make_openai_planner
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("NEOSCAFFOLD_GRAPH_OFFLINE", raising=False)
+    assert make_openai_planner(KNOWN) is None
+
+
+def test_make_openai_planner_none_when_forced_offline(monkeypatch):
+    from server.domain.services.graph_builder import make_openai_planner
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("NEOSCAFFOLD_GRAPH_OFFLINE", "1")
+    assert make_openai_planner(KNOWN) is None
+
+
+def test_make_openai_planner_returns_callable(monkeypatch):
+    from server.domain.services.graph_builder import make_openai_planner
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("NEOSCAFFOLD_GRAPH_OFFLINE", raising=False)
+    planner = make_openai_planner(KNOWN)
+    assert callable(planner)
+
+
 # --- repair_graph directly ---
 def test_repair_drops_unknown_and_dangling():
     contracts = contracts_from_nodes(KNOWN)

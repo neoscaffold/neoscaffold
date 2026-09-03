@@ -224,17 +224,61 @@ def parse_graph(
     return GraphSpec(nodes=nodes)
 
 
+# Inputs that are credentials/config, never auto-wired by connectivity repair.
+CREDENTIAL_INPUTS = frozenset(
+    {"api_key", "key", "token", "password", "secret", "authorization", "timeout", "model"}
+)
+# Required string fields the planner should fill from the user's intent.
+PROMPT_INPUTS = frozenset({"prompt", "text", "message", "instruction"})
+
+
+def _is_edge_value(value: Any) -> bool:
+    return isinstance(value, dict) and "originId" in value
+
+
+def _is_unfilled(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, InputRef):
+        return False
+    if _is_edge_value(value):
+        return False
+    return value == ""
+
+
+def edge_count(spec: GraphSpec) -> int:
+    return sum(len(node.links()) for node in spec.nodes.values())
+
+
+def _sorted_node_ids(ids: List[str]) -> List[str]:
+    def key(node_id: str):
+        try:
+            return (0, int(node_id))
+        except (TypeError, ValueError):
+            return (1, node_id)
+
+    return sorted(ids, key=key)
+
+
 def lint_graph(
     spec: GraphSpec,
     contracts: Optional[Mapping[str, NodeContract]] = None,
 ) -> List[str]:
     """Return soft warnings for a parsed graph (never raises).
 
-    Warnings: a declared required input is neither wired nor given a literal, and
-    an input name is not declared by the node's contract. These are surfaced into
-    agent context rather than hard-failed (harness.md §4).
+    Warnings: a declared required input is neither wired nor given a literal, an
+    input name is not declared by the node's contract, a required literal is
+    empty, or a multi-node graph has no wires. These are surfaced into agent
+    context rather than hard-failed (harness.md §4, §6).
     """
     warnings: List[str] = []
+    n_nodes = len(spec.nodes)
+    n_edges = edge_count(spec)
+    if n_nodes >= 2 and n_edges == 0:
+        warnings.append(
+            f"graph has {n_nodes} nodes but no wires; the workflow is disconnected"
+        )
+
     if contracts is None:
         return warnings
     for node_id, node_spec in spec.nodes.items():
@@ -252,4 +296,156 @@ def lint_graph(
                 warnings.append(
                     f"{node_id}.inputs.{required}: required input is not provided"
                 )
+            elif _is_unfilled(node_spec.inputs[required]):
+                warnings.append(
+                    f"{node_id}.inputs.{required}: required input is empty"
+                )
     return warnings
+
+
+def repair_connectivity(
+    payload: Any,
+    *,
+    contracts: Optional[Mapping[str, NodeContract]] = None,
+    user_prompt: Optional[str] = None,
+) -> tuple:
+    """Bounded connectivity repair (harness.md §6). Never invents nodes.
+
+    1. Fill empty ``prompt``/``text`` literals from ``user_prompt``.
+    2. Wire unused producers into unwired required dataflow inputs, in node-id
+       order, only when kinds are assignable. Credential fields are skipped.
+
+    Returns ``(payload, repairs)``.
+    """
+    repairs: List[str] = []
+    if not isinstance(payload, dict) or not payload:
+        return payload if isinstance(payload, dict) else {}, repairs
+
+    intent = (user_prompt or "").strip()
+    prompt_targets = [
+        node_id
+        for node_id, node in payload.items()
+        if isinstance(node, dict) and node.get("type")
+    ]
+    n_promptable = 0
+    if contracts is not None:
+        for node_id in prompt_targets:
+            node_type = payload[node_id].get("type")
+            contract = contracts.get(node_type)
+            if contract is None:
+                continue
+            if any(name in contract.input_kinds for name in PROMPT_INPUTS):
+                n_promptable += 1
+
+    agent_index = 0
+    for node_id in _sorted_node_ids(list(payload)):
+        node = payload.get(node_id)
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict):
+            inputs = {}
+            node["inputs"] = inputs
+        node_type = node.get("type")
+        contract = contracts.get(node_type) if contracts is not None else None
+        fill_names = list(PROMPT_INPUTS)
+        if contract is not None:
+            fill_names = [n for n in fill_names if n in contract.input_kinds]
+        filled_this_node = False
+        for name in fill_names:
+            if name in CREDENTIAL_INPUTS:
+                continue
+            if not _is_unfilled(inputs.get(name)):
+                continue
+            if not intent:
+                continue
+            if n_promptable > 1:
+                agent_index += 1
+                inputs[name] = f"{intent} (agent {agent_index})"
+            else:
+                inputs[name] = intent
+            repairs.append(f"filled '{node_id}.{name}' from the user prompt")
+            filled_this_node = True
+            if filled_this_node:
+                break
+
+    if contracts is None:
+        return payload, repairs
+
+    used_origins = set()
+    for node in payload.values():
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs") or {}
+        if not isinstance(inputs, dict):
+            continue
+        for value in inputs.values():
+            if _is_edge_value(value):
+                origin = value.get("originId")
+                if origin:
+                    used_origins.add(origin)
+
+    for target_id in _sorted_node_ids(list(payload)):
+        node = payload.get(target_id)
+        if not isinstance(node, dict):
+            continue
+        contract = contracts.get(node.get("type"))
+        if contract is None:
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict):
+            inputs = {}
+            node["inputs"] = inputs
+        for required in contract.required:
+            if required in CREDENTIAL_INPUTS or required in PROMPT_INPUTS:
+                continue
+            if not _is_unfilled(inputs.get(required)):
+                continue
+            target_kind = contract.input_kinds.get(required, TOP_KIND)
+            origin_id = _next_unused_producer(
+                payload,
+                contracts,
+                used_origins,
+                target_id,
+                target_kind,
+            )
+            if origin_id is None:
+                continue
+            inputs[required] = {"originId": origin_id}
+            used_origins.add(origin_id)
+            repairs.append(
+                f"wired '{origin_id}' -> '{target_id}.{required}'"
+            )
+
+    return payload, repairs
+
+
+def _next_unused_producer(
+    payload: Mapping[str, Any],
+    contracts: Mapping[str, NodeContract],
+    used_origins: set,
+    target_id: str,
+    target_kind: str,
+) -> Optional[str]:
+    """Pick the earliest unused producer whose output is assignable to ``target_kind``.
+
+    Only origins that appear *before* ``target_id`` in id-order are considered, so
+    the repair cannot introduce cycles.
+    """
+    ordered = _sorted_node_ids(list(payload))
+    try:
+        limit = ordered.index(target_id)
+    except ValueError:
+        limit = len(ordered)
+    for origin_id in ordered[:limit]:
+        if origin_id in used_origins or origin_id == target_id:
+            continue
+        origin = payload.get(origin_id)
+        if not isinstance(origin, dict):
+            continue
+        origin_contract = contracts.get(origin.get("type"))
+        if origin_contract is None:
+            continue
+        if is_assignable(origin_contract.output_kind, target_kind):
+            return origin_id
+    return None

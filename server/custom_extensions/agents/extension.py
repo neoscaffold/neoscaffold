@@ -34,7 +34,7 @@ def _run_cerebras_agent(api_key, prompt):
 
     config_list = [
         {
-            "model": "zai-glm-4.7",
+            "model": "qwen-3.8-27b",
             "api_key": api_key,
             "api_type": "cerebras",
             "max_tokens": 8192,

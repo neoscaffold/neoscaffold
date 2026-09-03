@@ -718,7 +718,7 @@ class Cerebras_LLM:
             "model": {
                 "kind": "*",
                 "name": "model",
-                "widget": {"kind": "string", "name": "model", "default": "llama3.1-8b"},
+                "widget": {"kind": "string", "name": "model", "default": "qwen-3.8-27b"},
             },
         },
     }
