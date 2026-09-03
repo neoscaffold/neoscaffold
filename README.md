@@ -1,14 +1,14 @@
 <div align="center">
   <!-- Version Badge -->
   <a href='https://github.com/neoscaffold/neoscaffold/releases'>
-    <img src='https://img.shields.io/badge/version-0.2.0-black?style=for-the-badge'>
+    <img src='https://img.shields.io/badge/version-1.0.0-black?style=for-the-badge'>
   </a>
   <!-- Chat Badge -->
   <a href='https://discord.gg/fWncYRBY'>
     <img src='https://img.shields.io/badge/chat-discord-magenta?logo=discord&style=for-the-badge'>
   </a>
   <!-- Docs Badge -->
-  <a href=''>
+  <a href='https://github.com/neoscaffold/neoscaffold/tree/main/docs'>
     <img src='https://img.shields.io/badge/read-docs-blue?style=for-the-badge'>
   </a>
   <!-- Precommit Badge -->
@@ -21,13 +21,17 @@
   <img src="pictures/neoscaffold-typeface.webp" alt="NeoScaffold Logo"/>
 </h1>
 
-NeoScaffold let's you visually program workflows for ai agents and more.
+NeoScaffold lets you visually program workflows for AI agents and more.
 
 You can import, edit, and export workflows for:
-  - building trustworthy and safe ai use-cases
+  - building trustworthy and safe AI use-cases
   - iterating quickly on new ideas
+  - describing a workflow in natural language and getting a validated graph
+  - driving the editor from other agents over OpenAPI and MCP
 
-Version 0.2.0 adds parallel graph execution for async-friendly workflows, including UI execution mode controls, async node evaluation, and control-flow support that completes `IfEqual` and `WhileLoop` graphs through their `End*` nodes while only running the selected branch/body path.
+**Version 1.0.0** is the first production release. The editor Prompt bar turns a request into a parse-validated prompt-graph (`POST /v1/agent/build-graph`). Agent Activity shows live subagent output. Other agents can control NeoScaffold through an OpenAPI 3.1 contract and an MCP tools server. Failed runs can ask how to fix the graph and arm a patch to accept. Parallel execution from 0.2.0 remains: sequential or parallel mode, async node evaluation, and control-flow through `IfEqual` / `ForLoop` / `WhileLoop` `End*` nodes.
+
+See [CHANGELOG.md](CHANGELOG.md), the [engineering harness](harness.md), [MCP + OpenAPI](docs/MCP.md), and the [v1.0.0 roadmap](docs/ROADMAP_1.0.0.md).
 
 ![-----------------------------------------------------](pictures/aquadivider.png)
 
@@ -41,6 +45,8 @@ Version 0.2.0 adds parallel graph execution for async-friendly workflows, includ
     <li>
       <a href="#fun-with-neoscaffold"> ➤ Fun With NeoScaffold 🎨</a>
       <ul>
+        <li><a href="#natural-language-graphs"> ➤ Natural-Language Graphs 💬</a></li>
+        <li><a href="#controlling-neoscaffold-from-other-agents"> ➤ Controlling NeoScaffold from Other Agents 🤖</a></li>
         <li><a href="#building-an-ai-persona-agent"> ➤ Building an AI Persona Agent 🕴️</a></li>
         <li><a href="#custom-extensions-for-more-nodes"> ➤ Custom Extensions for More Nodes 🧩</a></li>
         <li><a href="#rules-for-reliable-quality"> ➤ Rules for Reliable Quality 🔍</a></li>
@@ -134,7 +140,23 @@ npm start;
 
 ## Fun With NeoScaffold
 
-NeoScaffold can be a colorful and fun way to build workflows. You can use existing nodes, or create your own.
+NeoScaffold can be a colorful and fun way to build workflows. You can use existing nodes, describe a workflow in the Prompt bar, or create your own nodes.
+
+![-----------------------------------------------------](pictures/aquadivider.png)
+
+### Natural-Language Graphs
+
+The Prompt overlay in the editor sends your request to `POST /v1/agent/build-graph`. The harness planner returns a validated prompt-graph (offline and deterministic by default; an LLM planner when `OPENAI_API_KEY` is set). The editor inserts the nodes, wires them, and keeps a conversation of thoughts and outputs. When a run fails, the same conversation can ask how to fix the graph and arm a patch for Accept.
+
+Import and export portable workflow JSON with `POST /v1/agent/import-workflow` and `POST /v1/agent/export-workflow`.
+
+![-----------------------------------------------------](pictures/aquadivider.png)
+
+### Controlling NeoScaffold from Other Agents
+
+v1.0.0 is designed to be driven by other agents. `GET /v1/openapi.json` is the HTTP contract. MCP tools are derived from that spec (`GET /v1/mcp/tools`); run `server/mcp_server.py` against a live server. See [docs/MCP.md](docs/MCP.md).
+
+Health and metrics: `GET /v1/healthz`, `GET /v1/metrics` (Prometheus). Live subagent spans and per-node streams: `GET /v1/agent/events` and the Agent Activity panel.
 
 ![-----------------------------------------------------](pictures/aquadivider.png)
 
