@@ -1,0 +1,50 @@
+<div
+  class="neo-agent-activity"
+  data-test-agent-activity
+  {{did-insert this.start}}
+  {{will-destroy this.stop}}
+>
+  <div class="npa-header">
+    <button
+      type="button"
+      class="npa-toggle"
+      {{on "click" this.toggle}}
+      data-test-agent-toggle
+    >
+      {{if this.open "▾" "▸"}} Agent Activity ({{this.count}})
+    </button>
+    <button
+      type="button"
+      class="npa-refresh"
+      {{on "click" this.refresh}}
+      data-test-agent-refresh
+    >
+      Refresh
+    </button>
+  </div>
+
+  {{#if this.open}}
+    <div class="npa-body" data-test-agent-body>
+      {{#if this.errorMessage}}
+        <div class="npa-error">{{this.errorMessage}}</div>
+      {{/if}}
+
+      {{#if this.hasEvents}}
+        <ul class="npa-list">
+          {{#each this.events as |event|}}
+            <li
+              class="npa-event npa-{{event.status}} npa-kind-{{event.kind}}"
+              data-test-agent-event
+            >
+              <span class="npa-status">{{event.status}}</span>
+              <span class="npa-kind">{{event.kind}}</span>
+              <span class="npa-name">{{event.name}}</span>
+            </li>
+          {{/each}}
+        </ul>
+      {{else}}
+        <div class="npa-empty">No agent activity yet. Generate a graph to see subagents.</div>
+      {{/if}}
+    </div>
+  {{/if}}
+</div>

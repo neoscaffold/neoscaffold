@@ -65,4 +65,18 @@ export default class LitegraphService extends Service {
     const created = this.insertGraph(result);
     return { result, created };
   }
+
+  /**
+   * Fetch recent agent/subagent activity events for the visibility panel.
+   */
+  async fetchAgentEvents(limit = 100) {
+    const response = await fetch(
+      `${this.baseUrl}/v1/agent/events?limit=${encodeURIComponent(limit)}`,
+    );
+    if (!response.ok) {
+      throw new Error('failed to fetch agent events');
+    }
+    const body = await response.json();
+    return body.events || [];
+  }
 }
