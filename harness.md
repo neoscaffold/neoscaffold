@@ -280,7 +280,28 @@ records span-like events (`id`, `parent_id`, `kind`, `name`, `status`, timings,
 This complements the metrics/logs/traces in §5: metrics answer "how much / how
 fast", the event log answers "what is each subagent doing right now".
 
-## 12. What the harness deliberately does not do
+## 12. Integration workload: the coding-agent swarm
+
+The `agent_swarm` extension is the end-to-end exercise of the whole harness. From
+a single prompt, prompt mode builds a fan-out/fan-in graph: one `SwarmSolverNode`
+per problem (each an independent agent), a wired `nsArrayAppend` chain collecting
+their outputs, and a `SwarmJoinNode` that fork-joins the results.
+
+Each solver agent:
+- writes a Python solution (offline reference solution in tests; a live OpenAI
+  model such as `gpt-5.6-terra` in production, streamed token-by-token);
+- streams its work to the UI scoped to its node (`AGENT_EVENTS.stream(node_id, …)`,
+  surfaced in the Agent Activity panel and over the `agent_stream` WebSocket);
+- verifies its solution by running it in the subprocess sandbox
+  (`sandbox.run_python_code`) against sample I/O.
+
+This ties together §1–§11: parse-validated graph topology, per-node observability
+and streaming, sandboxed execution, and the agents-spinning-up-agents
+orchestration. It is the canonical "does our setup work well?" test — 10 agents
+running concurrently, each solving and verifying independently, then fork-joined
+into one report.
+
+## 13. What the harness deliberately does not do
 
 - It does not re-validate typed structures after the edge parse.
 - It does not hard-fail on style or on soft constraints; those are warnings.
