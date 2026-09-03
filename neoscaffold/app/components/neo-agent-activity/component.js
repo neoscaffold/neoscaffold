@@ -12,10 +12,15 @@ export default class NeoAgentActivityComponent extends Component {
   @service litegraph;
 
   @tracked events = [];
+  @tracked streams = [];
   @tracked open = true;
   @tracked errorMessage = '';
 
   _timer = null;
+
+  get hasStreams() {
+    return this.streams.length > 0;
+  }
 
   get count() {
     return this.events.length;
@@ -47,9 +52,10 @@ export default class NeoAgentActivityComponent extends Component {
   @action
   async refresh() {
     try {
-      const events = await this.litegraph.fetchAgentEvents(100);
+      const { events, streams } = await this.litegraph.fetchAgentActivity(100);
       // Newest first for display; child "node" spans keep their parent link.
       this.events = events.slice().reverse();
+      this.streams = streams;
       this.errorMessage = '';
     } catch (error) {
       this.errorMessage = error.message || 'failed to load activity';

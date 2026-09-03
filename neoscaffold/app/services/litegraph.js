@@ -70,13 +70,26 @@ export default class LitegraphService extends Service {
    * Fetch recent agent/subagent activity events for the visibility panel.
    */
   async fetchAgentEvents(limit = 100) {
+    const { events } = await this.fetchAgentActivity(limit);
+    return events;
+  }
+
+  /**
+   * Fetch both agent events and the per-node live streams in one call.
+   * Returns `{ events, streams }` where `streams` is a list of
+   * `{ node_id, name, text }` scoped to each agent's node.
+   */
+  async fetchAgentActivity(limit = 100) {
     const response = await fetch(
       `${this.baseUrl}/v1/agent/events?limit=${encodeURIComponent(limit)}`,
     );
     if (!response.ok) {
-      throw new Error('failed to fetch agent events');
+      throw new Error('failed to fetch agent activity');
     }
     const body = await response.json();
-    return body.events || [];
+    return {
+      events: body.events || [],
+      streams: Object.values(body.streams || {}),
+    };
   }
 }

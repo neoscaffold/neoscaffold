@@ -29,7 +29,20 @@
         <div class="npa-error">{{this.errorMessage}}</div>
       {{/if}}
 
+      {{#if this.hasStreams}}
+        <div class="npa-streams" data-test-agent-streams>
+          <div class="npa-section-title">Live agent streams</div>
+          {{#each this.streams as |stream|}}
+            <details class="npa-stream" data-test-agent-stream open>
+              <summary class="npa-stream-name">{{stream.name}}</summary>
+              <pre class="npa-stream-text">{{stream.text}}</pre>
+            </details>
+          {{/each}}
+        </div>
+      {{/if}}
+
       {{#if this.hasEvents}}
+        <div class="npa-section-title">Events</div>
         <ul class="npa-list">
           {{#each this.events as |event|}}
             <li

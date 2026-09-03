@@ -94,6 +94,45 @@
     font-weight: 600;
   }
 
+  .npa-section-title {
+    margin: 8px 0 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.6;
+  }
+
+  .npa-streams {
+    margin-bottom: 6px;
+  }
+
+  .npa-stream {
+    margin-bottom: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .npa-stream-name {
+    cursor: pointer;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: 600;
+  }
+
+  .npa-stream-text {
+    margin: 0;
+    padding: 6px 8px;
+    max-height: 160px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #b8d982;
+    background: #101014;
+  }
+
   .npa-empty,
   .npa-error {
     padding: 8px 6px;
