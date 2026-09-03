@@ -72,8 +72,23 @@ def build_openapi_spec(server: Optional[Any] = None) -> Dict[str, Any]:
                                     "properties": {
                                         "prompt": {
                                             "type": "string",
-                                            "description": "Natural-language description of the workflow.",
-                                        }
+                                            "description": "Natural-language description of the workflow or a widget change.",
+                                        },
+                                        "canvas": {
+                                            "type": "object",
+                                            "description": "Current canvas nodes and widget values (node_id -> {type, name, widgets}).",
+                                            "additionalProperties": True,
+                                        },
+                                        "history": {
+                                            "type": "array",
+                                            "description": "Prior conversation turns for the prompt bar.",
+                                            "items": {"type": "object"},
+                                        },
+                                        "workflow": {
+                                            "type": "object",
+                                            "description": "Current LiteGraph serialize() payload or {prompt, workflow} snapshot for import/export.",
+                                            "additionalProperties": True,
+                                        },
                                     },
                                 }
                             }
@@ -93,6 +108,20 @@ def build_openapi_spec(server: Optional[Any] = None) -> Dict[str, Any]:
                                             "warnings": {"type": "array", "items": {"type": "string"}},
                                             "repairs": {"type": "array", "items": {"type": "string"}},
                                             "source": {"type": "string"},
+                                            "thoughts": {"type": "string"},
+                                            "widget_edits": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "node_id": {"type": "string"},
+                                                        "widget": {"type": "string"},
+                                                        "value": {},
+                                                        "type": {"type": "string"},
+                                                    },
+                                                },
+                                            },
+                                            "exported_workflow": {"type": "object"},
                                         },
                                     }
                                 }
@@ -185,6 +214,102 @@ def build_openapi_spec(server: Optional[Any] = None) -> Dict[str, Any]:
                                 }
                             },
                         }
+                    },
+                }
+            },
+            "/v1/agent/import-workflow": {
+                "post": {
+                    "operationId": "importWorkflow",
+                    "summary": "Import a LiteGraph or prompt-graph workflow.",
+                    "description": (
+                        "Accepts a prompt-graph, {prompt: ...} envelope, or "
+                        "LiteGraph serialize() JSON and returns a validated "
+                        "prompt-graph plus layout."
+                    ),
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "Imported prompt-graph and layout."},
+                        "422": {"description": "Not a recognizable workflow."},
+                    },
+                }
+            },
+            "/v1/agent/suggest-fix": {
+                "post": {
+                    "operationId": "suggestFix",
+                    "summary": "Suggest an accept-ready graph patch for a run error.",
+                    "description": (
+                        "Given a failed-run error message and the current "
+                        "prompt-graph, return a short ask, a suggested fix, and "
+                        "an optional patch ({add_nodes, wire}) the client can apply."
+                    ),
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "description": "Exception message from the failed run.",
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Alias for error.",
+                                        },
+                                        "node_id": {
+                                            "type": "string",
+                                            "description": "Failed node id, if known.",
+                                        },
+                                        "prompt": {"$ref": "#/components/schemas/PromptGraph"},
+                                        "node_errors": {
+                                            "type": "array",
+                                            "items": {"type": "object"},
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Ask, suggestion, and optional armed patch."
+                        },
+                        "400": {"description": "Missing error message."},
+                    },
+                }
+            },
+            "/v1/agent/export-workflow": {
+                "post": {
+                    "operationId": "exportWorkflow",
+                    "summary": "Export a prompt-graph as a portable workflow JSON.",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "prompt": {"$ref": "#/components/schemas/PromptGraph"},
+                                        "workflow": {"type": "object"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "Portable workflow JSON."},
+                        "400": {"description": "Missing prompt or workflow."},
                     },
                 }
             },

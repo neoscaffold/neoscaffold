@@ -219,6 +219,203 @@ def test_lint_graph_warns_empty_required_literal():
     assert any("text" in w and "empty" in w for w in warnings)
 
 
+def test_complete_control_flow_rewires_existing_end_node():
+    from server.harness.parsing import complete_control_flow
+
+    class FakeIf:
+        INPUT = {
+            "required_inputs": {
+                "a": {"kind": "*", "name": "a"},
+                "b": {"kind": "*", "name": "b"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "result"}
+
+    class FakeBranch:
+        INPUT = {"required_inputs": {"IfEqual": {"kind": "*", "name": "IfEqual"}}}
+        OUTPUT = {"kind": "*", "name": "result"}
+
+    nodes = {
+        **NODES,
+        "IfEqual": {"python_class": FakeIf},
+        "IfEqualTrue": {"python_class": FakeBranch},
+        "IfEqualFalse": {"python_class": FakeBranch},
+        "EndIfEqual": {"python_class": FakeBranch},
+    }
+    contracts = contracts_from_nodes(nodes)
+    payload = {
+        "5": {"type": "IfEqual", "inputs": {"a": "x", "b": "x"}},
+        "8": {"type": "EndIfEqual", "inputs": {}},
+    }
+    repaired, repairs = complete_control_flow(payload, contracts=contracts)
+    ends = [n for n in repaired.values() if n["type"] == "EndIfEqual"]
+    assert len(ends) == 1
+    assert repaired["8"]["inputs"]["IfEqual"] == {"originId": "5"}
+    assert any("8.IfEqual" in r for r in repairs)
+
+
+def test_complete_control_flow_inserts_if_branches_and_end():
+    from server.harness.parsing import complete_control_flow
+
+    class FakeIf:
+        INPUT = {
+            "required_inputs": {
+                "a": {"kind": "*", "name": "a"},
+                "b": {"kind": "*", "name": "b"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "result"}
+
+    class FakeBranch:
+        INPUT = {"required_inputs": {"IfEqual": {"kind": "*", "name": "IfEqual"}}}
+        OUTPUT = {"kind": "*", "name": "result"}
+
+    nodes = {
+        **NODES,
+        "IfEqual": {"python_class": FakeIf},
+        "IfEqualTrue": {"python_class": FakeBranch},
+        "IfEqualFalse": {"python_class": FakeBranch},
+        "EndIfEqual": {"python_class": FakeBranch},
+    }
+    contracts = contracts_from_nodes(nodes)
+    payload = {"1": {"type": "IfEqual", "inputs": {"a": "x", "b": "x"}}}
+    repaired, repairs = complete_control_flow(payload, contracts=contracts)
+    types = [n["type"] for n in repaired.values()]
+    assert "IfEqualTrue" in types
+    assert "IfEqualFalse" in types
+    assert "EndIfEqual" in types
+    assert any("IfEqualTrue" in r for r in repairs)
+
+
+def test_complete_control_flow_inserts_end_for_loop():
+    from server.harness.parsing import complete_control_flow
+
+    class FakeFor:
+        INPUT = {
+            "required_inputs": {
+                "start": {"kind": "integer", "name": "start"},
+                "stop": {"kind": "integer", "name": "stop"},
+            }
+        }
+        OUTPUT = {"kind": "control_flow", "name": "loop"}
+
+    class FakeEnd:
+        INPUT = {
+            "required_inputs": {
+                "ForLoop": {"kind": "control_flow", "name": "ForLoop"},
+                "node_inputs": {"kind": "*", "name": "node_inputs"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    nodes = {
+        **NODES,
+        "ForLoop": {"python_class": FakeFor},
+        "EndForLoop": {"python_class": FakeEnd},
+    }
+    contracts = contracts_from_nodes(nodes)
+    payload = {"2": {"type": "ForLoop", "inputs": {"start": 0, "stop": 2}}}
+    repaired, repairs = complete_control_flow(payload, contracts=contracts)
+    end = next(n for n in repaired.values() if n["type"] == "EndForLoop")
+    assert end["inputs"]["ForLoop"] == {"originId": "2"}
+    assert any("EndForLoop" in r for r in repairs)
+
+
+def test_rewrite_swarm_join_without_solvers_to_concat():
+    from server.harness.parsing import rewrite_misused_combiners
+
+    class FakeConcat:
+        INPUT = {
+            "required_inputs": {
+                "a": {"kind": "*", "name": "a"},
+                "b": {"kind": "*", "name": "b"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    class FakeJoin:
+        INPUT = {"required_inputs": {"results": {"kind": "array", "name": "results"}}}
+        OUTPUT = {"kind": "object", "name": "report"}
+
+    nodes = {
+        **NODES,
+        "ConcatString": {"python_class": FakeConcat},
+        "SwarmJoinNode": {"python_class": FakeJoin},
+    }
+    contracts = contracts_from_nodes(nodes)
+    payload = {
+        "1": {"type": "nsString", "inputs": {"text": "a"}},
+        "2": {"type": "SwarmJoinNode", "inputs": {"results": []}},
+    }
+    repaired, repairs = rewrite_misused_combiners(payload, contracts=contracts)
+    assert repaired["2"]["type"] == "ConcatString"
+    assert "results" not in repaired["2"]["inputs"]
+    assert any("ConcatString" in r for r in repairs)
+
+
+def test_rewrite_keeps_swarm_join_when_solvers_present():
+    from server.harness.parsing import rewrite_misused_combiners
+
+    class FakeConcat:
+        INPUT = {
+            "required_inputs": {
+                "a": {"kind": "*", "name": "a"},
+                "b": {"kind": "*", "name": "b"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    class FakeJoin:
+        INPUT = {"required_inputs": {"results": {"kind": "array", "name": "results"}}}
+        OUTPUT = {"kind": "object", "name": "report"}
+
+    class FakeSolver:
+        INPUT = {"required_inputs": {"problem_id": {"kind": "string", "name": "problem_id"}}}
+        OUTPUT = {"kind": "object", "name": "solution"}
+
+    nodes = {
+        **NODES,
+        "ConcatString": {"python_class": FakeConcat},
+        "SwarmJoinNode": {"python_class": FakeJoin},
+        "SwarmSolverNode": {"python_class": FakeSolver},
+    }
+    contracts = contracts_from_nodes(nodes)
+    payload = {
+        "1": {"type": "SwarmSolverNode", "inputs": {"problem_id": "x"}},
+        "2": {"type": "SwarmJoinNode", "inputs": {"results": []}},
+    }
+    repaired, repairs = rewrite_misused_combiners(payload, contracts=contracts)
+    assert repaired["2"]["type"] == "SwarmJoinNode"
+    assert repairs == []
+
+
+def test_repair_connectivity_overwrites_literals_when_disconnected():
+    from server.harness.parsing import repair_connectivity
+
+    class FakeConcat:
+        INPUT = {
+            "required_inputs": {
+                "a": {"kind": "*", "name": "a"},
+                "b": {"kind": "*", "name": "b"},
+            }
+        }
+        OUTPUT = {"kind": "*", "name": "*"}
+
+    nodes = {**NODES, "ConcatString": {"python_class": FakeConcat}}
+    contracts = contracts_from_nodes(nodes)
+    payload = {
+        "1": {"type": "nsString", "inputs": {"text": "hello"}},
+        "2": {"type": "nsString", "inputs": {"text": "world"}},
+        "3": {"type": "ConcatString", "inputs": {"a": "left", "b": "right"}},
+        "4": {"type": "ConsoleLog", "inputs": {"any": "combined"}},
+    }
+    repaired, repairs = repair_connectivity(payload, contracts=contracts)
+    assert repaired["3"]["inputs"]["a"] == {"originId": "1"}
+    assert repaired["3"]["inputs"]["b"] == {"originId": "2"}
+    assert repaired["4"]["inputs"]["any"] == {"originId": "3"}
+    assert any("wired" in r for r in repairs)
+
+
 def test_repair_connectivity_wires_islands_in_id_order():
     from server.harness.parsing import repair_connectivity
 

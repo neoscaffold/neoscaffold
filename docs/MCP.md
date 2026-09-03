@@ -21,6 +21,9 @@ The tool surface is derived from the OpenAPI operations. Inspect it live at
 | `listExtensions` | List node/rule contracts |
 | `getInfo` | Queue/exec info |
 | `getAgentEvents` | Recent subagent activity (visibility) |
+| `importWorkflow` | Import a LiteGraph or prompt-graph workflow |
+| `exportWorkflow` | Export a prompt-graph as portable JSON |
+| `suggestFix` | Run error + prompt-graph → accept-ready patch |
 | `getMetrics` | Prometheus metrics |
 | `getHealth` | Liveness + counts |
 | `getOpenApi` | The OpenAPI document |

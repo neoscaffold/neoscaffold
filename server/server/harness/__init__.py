@@ -8,6 +8,7 @@ These utilities are intentionally dependency-free and hoisted into the repo to
 avoid dependency hell.
 """
 
+from .execution_fix import suggest_execution_fix
 from .parsing import (
     TOP_KIND,
     GraphSpec,
@@ -23,6 +24,8 @@ from .parsing import (
     parse_graph,
     repair_connectivity,
     insert_value_path_adapters,
+    rewrite_misused_combiners,
+    complete_control_flow,
 )
 
 __all__ = [
@@ -40,4 +43,7 @@ __all__ = [
     "parse_graph",
     "repair_connectivity",
     "insert_value_path_adapters",
+    "rewrite_misused_combiners",
+    "complete_control_flow",
+    "suggest_execution_fix",
 ]

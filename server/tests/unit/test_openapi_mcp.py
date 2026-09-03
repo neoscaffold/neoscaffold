@@ -13,7 +13,17 @@ def test_openapi_spec_shape():
     assert spec["openapi"].startswith("3.")
     assert spec["info"]["title"] == "NeoScaffold API"
     paths = spec["paths"]
-    for path in ("/v1/agent/build-graph", "/prompt", "/extensions", "/v1/metrics", "/v1/healthz", "/v1/agent/events"):
+    for path in (
+        "/v1/agent/build-graph",
+        "/v1/agent/import-workflow",
+        "/v1/agent/export-workflow",
+        "/v1/agent/suggest-fix",
+        "/prompt",
+        "/extensions",
+        "/v1/metrics",
+        "/v1/healthz",
+        "/v1/agent/events",
+    ):
         assert path in paths, path
     # every operation has an operationId (required for MCP tool derivation)
     for path_item in paths.values():
@@ -25,7 +35,17 @@ def test_openapi_spec_shape():
 def test_toolset_lists_tools_from_operations():
     toolset = OpenApiToolset(build_openapi_spec())
     names = {t["name"] for t in toolset.tools()}
-    assert {"buildGraph", "runPrompt", "listExtensions", "getMetrics", "getHealth", "getAgentEvents"} <= names
+    assert {
+        "buildGraph",
+        "runPrompt",
+        "listExtensions",
+        "getMetrics",
+        "getHealth",
+        "getAgentEvents",
+        "importWorkflow",
+        "exportWorkflow",
+        "suggestFix",
+    } <= names
     for tool in toolset.tools():
         assert "description" in tool
         assert tool["inputSchema"]["type"] == "object"

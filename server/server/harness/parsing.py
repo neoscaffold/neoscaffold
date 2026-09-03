@@ -230,6 +230,27 @@ CREDENTIAL_INPUTS = frozenset(
 )
 # Required string fields the planner should fill from the user's intent.
 PROMPT_INPUTS = frozenset({"prompt", "text", "message", "instruction"})
+# Numeric / name config on loops — keep literals, do not auto-wire.
+LITERAL_CONFIG_INPUTS = frozenset(
+    {
+        "condition_key",
+        "index_key",
+        "item_key",
+        "key_key",
+        "start",
+        "stop",
+        "step",
+        "delimiter",
+        "value_path",
+    }
+)
+# Required control-link inputs may only be wired from the matching node type.
+CONTROL_LINK_INPUTS = {
+    "IfEqual": "IfEqual",
+    "WhileLoop": "WhileLoop",
+    "ForLoop": "ForLoop",
+    "ForEachLoop": "ForEachLoop",
+}
 
 
 def _is_edge_value(value: Any) -> bool:
@@ -243,7 +264,22 @@ def _is_unfilled(value: Any) -> bool:
         return False
     if _is_edge_value(value):
         return False
-    return value == ""
+    if value == "" or value == [] or value == {}:
+        return True
+    return False
+
+
+def _payload_has_edges(payload: Mapping[str, Any]) -> bool:
+    for node in payload.values():
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        for value in inputs.values():
+            if _is_edge_value(value) and value.get("originId"):
+                return True
+    return False
 
 
 def edge_count(spec: GraphSpec) -> int:
@@ -385,6 +421,10 @@ def repair_connectivity(
                 if origin:
                     used_origins.add(origin)
 
+    # Placeholder literals (e.g. results=[], any="combined") look filled, so a
+    # fully disconnected proposal never gets wires unless we overwrite them.
+    force_dataflow = not _payload_has_edges(payload)
+
     for target_id in _sorted_node_ids(list(payload)):
         node = payload.get(target_id)
         if not isinstance(node, dict):
@@ -396,11 +436,17 @@ def repair_connectivity(
         if not isinstance(inputs, dict):
             inputs = {}
             node["inputs"] = inputs
-        for required in contract.required:
+        for required in sorted(contract.required):
             if required in CREDENTIAL_INPUTS or required in PROMPT_INPUTS:
                 continue
-            if not _is_unfilled(inputs.get(required)):
+            if required in LITERAL_CONFIG_INPUTS:
                 continue
+            current = inputs.get(required)
+            if _is_edge_value(current):
+                continue
+            if not _is_unfilled(current) and not force_dataflow:
+                continue
+            required_type = CONTROL_LINK_INPUTS.get(required)
             target_kind = contract.input_kinds.get(required, TOP_KIND)
             origin_id = _next_unused_producer(
                 payload,
@@ -408,15 +454,63 @@ def repair_connectivity(
                 used_origins,
                 target_id,
                 target_kind,
+                required_type=required_type,
             )
             if origin_id is None:
                 continue
             inputs[required] = {"originId": origin_id}
-            used_origins.add(origin_id)
+            # Control heads (IfEqual, ForLoop, …) fan out to many companions.
+            if required_type is None:
+                used_origins.add(origin_id)
             repairs.append(
                 f"wired '{origin_id}' -> '{target_id}.{required}'"
             )
 
+    return payload, repairs
+
+
+SWARM_JOIN_NODE = "SwarmJoinNode"
+SWARM_SOLVER_NODE = "SwarmSolverNode"
+CONCAT_STRING_NODE = "ConcatString"
+
+
+def rewrite_misused_combiners(
+    payload: Any,
+    *,
+    contracts: Optional[Mapping[str, NodeContract]] = None,
+) -> tuple:
+    """Rewrite SwarmJoin used as a generic combiner into ConcatString.
+
+    SwarmJoinNode.results expects an array of SwarmSolverNode reports. Models
+    often pick it to "combine" text agents, which leaves an unwired island.
+    """
+    repairs: List[str] = []
+    if not isinstance(payload, dict) or not payload:
+        return payload if isinstance(payload, dict) else {}, repairs
+    if contracts is not None and CONCAT_STRING_NODE not in contracts:
+        return payload, repairs
+
+    types = {
+        node.get("type")
+        for node in payload.values()
+        if isinstance(node, dict)
+    }
+    if SWARM_JOIN_NODE not in types or SWARM_SOLVER_NODE in types:
+        return payload, repairs
+
+    for node_id, node in payload.items():
+        if not isinstance(node, dict) or node.get("type") != SWARM_JOIN_NODE:
+            continue
+        node["type"] = CONCAT_STRING_NODE
+        inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+        node["inputs"] = {
+            name: inputs[name]
+            for name in ("a", "b")
+            if name in inputs
+        }
+        repairs.append(
+            f"rewrote '{node_id}' from SwarmJoinNode to ConcatString"
+        )
     return payload, repairs
 
 
@@ -426,22 +520,37 @@ def _next_unused_producer(
     used_origins: set,
     target_id: str,
     target_kind: str,
+    required_type: Optional[str] = None,
 ) -> Optional[str]:
     """Pick the earliest unused producer whose output is assignable to ``target_kind``.
 
     Only origins that appear *before* ``target_id`` in id-order are considered, so
-    the repair cannot introduce cycles.
+    the repair cannot introduce cycles. ``required_type`` restricts the origin to
+    one node type (used for IfEqual / loop control links).
     """
     ordered = _sorted_node_ids(list(payload))
+    if required_type is not None:
+        for origin_id in ordered:
+            if origin_id == target_id:
+                continue
+            origin = payload.get(origin_id)
+            if isinstance(origin, dict) and origin.get("type") == required_type:
+                return origin_id
+        return None
+
     try:
         limit = ordered.index(target_id)
     except ValueError:
         limit = len(ordered)
-    for origin_id in ordered[:limit]:
+    candidates = ordered[:limit] + ordered[limit + 1 :]
+    succs = _outgoing(payload)
+    for origin_id in candidates:
         if origin_id in used_origins or origin_id == target_id:
             continue
         origin = payload.get(origin_id)
         if not isinstance(origin, dict):
+            continue
+        if _can_reach(succs, target_id, origin_id):
             continue
         origin_contract = contracts.get(origin.get("type"))
         if origin_contract is None:
@@ -449,6 +558,35 @@ def _next_unused_producer(
         if is_assignable(origin_contract.output_kind, target_kind):
             return origin_id
     return None
+
+
+def _outgoing(payload: Mapping[str, Any]) -> Dict[str, List[str]]:
+    succs: Dict[str, List[str]] = {str(node_id): [] for node_id in payload}
+    for node_id, node in payload.items():
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+        for value in inputs.values():
+            if not _is_edge_value(value):
+                continue
+            origin = str(value.get("originId") or "")
+            if origin in succs:
+                succs[origin].append(str(node_id))
+    return succs
+
+
+def _can_reach(succs: Mapping[str, List[str]], start: str, goal: str) -> bool:
+    seen = set()
+    stack = [start]
+    while stack:
+        node_id = stack.pop()
+        if node_id == goal:
+            return True
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        stack.extend(succs.get(node_id, []))
+    return False
 
 
 VALUE_PATH_NODE = "ValuePath"
@@ -565,4 +703,116 @@ def insert_value_path_adapters(
             f"'{origin_id}' and '{target_id}.{input_name}'"
         )
 
+    return payload, repairs
+
+
+_CONTROL_SKELETONS = (
+    (
+        "IfEqual",
+        (
+            ("IfEqualTrue", "IfEqual"),
+            ("IfEqualFalse", "IfEqual"),
+            ("EndIfEqual", "IfEqual"),
+        ),
+    ),
+    ("WhileLoop", (("EndWhileLoop", "WhileLoop"),)),
+    ("ForLoop", (("EndForLoop", "ForLoop"),)),
+    ("ForEachLoop", (("EndForEachLoop", "ForEachLoop"),)),
+)
+
+
+def _control_link_state(
+    payload: Mapping[str, Any], origin_id: str, type_name: str, link_name: str
+) -> tuple:
+    """Return ``(already_linked, unlinked_ids)`` for companions of ``origin_id``."""
+    unlinked: List[str] = []
+    linked = False
+    for node_id, node in payload.items():
+        if not isinstance(node, dict) or node.get("type") != type_name:
+            continue
+        inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+        value = inputs.get(link_name)
+        if _is_edge_value(value) and str(value.get("originId")) == str(origin_id):
+            linked = True
+        else:
+            unlinked.append(str(node_id))
+    return linked, unlinked
+
+
+def complete_control_flow(
+    payload: Any,
+    *,
+    contracts: Optional[Mapping[str, NodeContract]] = None,
+) -> tuple:
+    """Wire or insert missing if/loop companions (True/False/End, End*Loop)."""
+    repairs: List[str] = []
+    if not isinstance(payload, dict) or not payload:
+        return payload if isinstance(payload, dict) else {}, repairs
+
+    for node_id in list(payload):
+        node = payload.get(node_id)
+        if not isinstance(node, dict):
+            continue
+        node_type = node.get("type")
+        for head_type, children in _CONTROL_SKELETONS:
+            if node_type != head_type:
+                continue
+            for child_type, link_name in children:
+                if contracts is not None and child_type not in contracts:
+                    continue
+                linked, unlinked = _control_link_state(
+                    payload, node_id, child_type, link_name
+                )
+                if linked:
+                    continue
+                if unlinked:
+                    companion_id = unlinked[0]
+                    inputs = payload[companion_id].setdefault("inputs", {})
+                    if not isinstance(inputs, dict):
+                        inputs = {}
+                        payload[companion_id]["inputs"] = inputs
+                    inputs[link_name] = {"originId": node_id}
+                    repairs.append(
+                        f"wired '{node_id}' -> '{companion_id}.{link_name}'"
+                    )
+                    continue
+                child_id = _next_node_id(payload)
+                payload[child_id] = {
+                    "type": child_type,
+                    "name": child_type,
+                    "inputs": {link_name: {"originId": node_id}},
+                }
+                repairs.append(
+                    f"inserted {child_type} '{child_id}' for '{node_id}'"
+                )
+    return payload, repairs
+
+
+def lint_needs_refine(warnings: List[str]) -> bool:
+    """True when lint still reports missing wires (credentials excluded)."""
+    return any(
+        (
+            "required input is not provided" in warning
+            or "no wires" in warning
+            or "required input is empty" in warning
+        )
+        and "api_key" not in warning
+        for warning in warnings
+    )
+
+
+def fill_unwired_if_literals(payload: Any) -> tuple:
+    """Last-resort literals so an IfEqual used as a judge can still compare."""
+    repairs: List[str] = []
+    if not isinstance(payload, dict):
+        return payload if isinstance(payload, dict) else {}, repairs
+    for node_id, node in payload.items():
+        if not isinstance(node, dict) or node.get("type") != "IfEqual":
+            continue
+        inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+        node["inputs"] = inputs
+        for name, literal in (("a", "pass"), ("b", "pass")):
+            if _is_unfilled(inputs.get(name)):
+                inputs[name] = literal
+                repairs.append(f"filled '{node_id}.{name}' with {literal!r}")
     return payload, repairs

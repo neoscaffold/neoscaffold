@@ -126,11 +126,19 @@ NL prompt ──▶ Planner ──▶ GraphSpec (typed) ──▶ parse_graph �
   never the model: an invalid proposal is repaired or rejected (§6), never
   executed blindly. A proposal that parses but is **disconnected** (no
   `originId` wires) is still repaired: unused producers are wired into unwired
-  required dataflow inputs, and empty `prompt` literals are filled from the
-  user's request. When a dict-producing node (e.g. `CerebrasAgent`) is wired
-  into a string consumer (`ConcatString`, `ConsoleLog`), the harness inserts a
-  `ValuePath` adapter (default field `summary`) rather than concatenating the
-  raw dict. Credential fields (`api_key`, …) are never invented.
+  required dataflow inputs (including placeholder literals on a fully
+  disconnected graph), and empty `prompt` literals are filled from the
+  user's request. `SwarmJoinNode` used without `SwarmSolverNode` is rewritten
+  to `ConcatString`. Missing if/loop companions (`IfEqualTrue`/`False`/`EndIfEqual`,
+  `EndForLoop`, `EndWhileLoop`, `EndForEachLoop`) are inserted and control-linked.
+  Pasted LiteGraph or prompt-graph JSON is imported; "export this workflow"
+  returns `exported_workflow` (also `POST /v1/agent/import-workflow` and
+  `POST /v1/agent/export-workflow`). After parse/repair, remaining lint
+  problems (missing required wires, empty dataflow inputs) are fed back to
+  the planner for up to two refine rounds. When a dict-producing node (e.g.
+  `CerebrasAgent`) is wired into a string consumer (`ConcatString`, `ConsoleLog`),
+  the harness inserts a `ValuePath` adapter (default field `summary`) rather than
+  concatenating the raw dict. Credential fields (`api_key`, …) are never invented.
 
 Every builder result is parsed before it leaves the service, so the endpoint and
 the editor only ever receive graphs that already satisfy §1–§2.

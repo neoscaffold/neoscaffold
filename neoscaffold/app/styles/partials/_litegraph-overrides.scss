@@ -23,6 +23,54 @@
 // stays portable rather than living in Ember components.
 // ---------------------------------------------------------------------------
 
+.neo-overlay-handle,
+.neo-overlay-reset {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #efebea;
+  cursor: grab;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.neo-overlay-handle {
+  letter-spacing: -2px;
+  opacity: 0.7;
+  user-select: none;
+
+  &:hover,
+  &:focus {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  &.is-dragging,
+  &:active {
+    cursor: grabbing;
+    opacity: 1;
+  }
+}
+
+.neo-overlay-reset {
+  cursor: pointer;
+  opacity: 0.65;
+  font-weight: 400;
+  margin-left: auto;
+
+  &:hover,
+  &:focus {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.is-dragging {
+  z-index: 40;
+}
+
 // Natural-language entry point (prefix: npb = neo-prompt-bar).
 .neo-prompt-bar {
   position: absolute;
@@ -37,7 +85,7 @@
   background: rgba(20, 20, 24, 0.88);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
   color: #efebea;
-  font-size: 13px;
+  font-size: 10px;
 
   &.is-collapsed {
     width: auto;
@@ -47,6 +95,7 @@
   .npb-header {
     display: flex;
     align-items: center;
+    gap: 4px;
   }
 
   .npb-toggle {
@@ -67,6 +116,49 @@
     margin-top: 0;
   }
 
+  .npb-transcript {
+    max-height: 240px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+    padding: 6px 4px 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .npb-turn {
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .npb-turn-user {
+    background: rgba(184, 217, 130, 0.08);
+  }
+
+  .npb-turn-label {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .npb-turn-text,
+  .npb-turn-output {
+    line-height: 1.4;
+  }
+
+  .npb-thoughts {
+    margin-bottom: 6px;
+    padding-left: 8px;
+    border-left: 2px solid rgba(184, 217, 130, 0.45);
+    color: rgba(239, 235, 234, 0.72);
+    font-style: italic;
+    font-size: 10px;
+    line-height: 1.45;
+  }
+
   .npb-form {
     display: flex;
     gap: 8px;
@@ -79,6 +171,7 @@
     border-radius: 8px;
     background: #17171b;
     color: #efebea;
+    font-size: 10px;
     outline: none;
 
     &:focus {
@@ -92,6 +185,7 @@
     border-radius: 8px;
     background: #b8d982;
     color: #17171b;
+    font-size: 10px;
     font-weight: 600;
     cursor: pointer;
 
@@ -126,6 +220,39 @@
     background: rgba(200, 60, 60, 0.2);
     color: #ffb4b4;
   }
+
+  .npb-patch-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .npb-accept,
+  .npb-dismiss {
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .npb-accept {
+    border: none;
+    background: #b8d982;
+    color: #17171b;
+  }
+
+  .npb-dismiss {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    color: #efebea;
+  }
+
+  .npb-patch-status {
+    margin-top: 6px;
+    font-size: 10px;
+    opacity: 0.7;
+  }
 }
 
 // Subagent visibility panel (prefix: npa = neo-agent-activity).
@@ -158,8 +285,9 @@
 
   .npa-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
+    gap: 6px;
     padding: 8px 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
@@ -277,5 +405,102 @@
   .npa-empty {
     padding: 8px 6px;
     opacity: 0.8;
+  }
+}
+
+// Workflow / debug menu (prefix: nsm = neo-side-menu).
+.neo-side-menu {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  left: auto;
+  transform: translateY(-50%);
+  z-index: 21;
+  width: 220px;
+  max-height: calc(100% - 80px);
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(20, 20, 24, 0.9);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  color: #efebea;
+  font-size: 12px;
+
+  &.is-collapsed {
+    width: auto;
+    min-width: 0;
+    max-height: none;
+    padding: 4px 8px;
+
+    .nsm-header {
+      border-bottom: none;
+    }
+
+    .nsm-body {
+      display: none;
+      margin-top: 0;
+    }
+  }
+
+  .nsm-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 2px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .nsm-toggle {
+    background: transparent;
+    border: none;
+    color: #efebea;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 4px 6px;
+  }
+
+  .nsm-body {
+    overflow-y: auto;
+    margin-top: 6px;
+  }
+
+  .nsm-section-title {
+    margin: 8px 0 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.6;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  .nsm-action {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #efebea;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+
+    &:hover,
+    &:focus {
+      background: rgba(184, 217, 130, 0.2);
+      color: #b8d982;
+    }
+  }
+
+  .nsm-action-danger:hover,
+  .nsm-action-danger:focus {
+    background: rgba(200, 60, 60, 0.25);
+    color: #ffb4b4;
   }
 }

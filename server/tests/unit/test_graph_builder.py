@@ -1,5 +1,7 @@
 """Tests for the natural-language graph builder (offline + LLM planners)."""
 
+import json
+
 import pytest
 
 from custom_extensions.core.extension import EXTENSION_MAPPINGS as CORE
@@ -7,6 +9,8 @@ from custom_extensions.network_requests.extension import EXTENSION_MAPPINGS as N
 from server.domain.services.graph_builder import (
     GraphBuilder,
     build_graph,
+    extract_llm_payload,
+    offline_widget_edits,
     repair_graph,
 )
 from server.harness.parsing import ParseError, contracts_from_nodes
@@ -192,6 +196,68 @@ def test_llm_disconnected_graph_is_wired_by_harness():
     assert any("wired" in r for r in result.repairs)
 
 
+def test_llm_swarm_join_without_solvers_is_rewritten_and_wired():
+    from custom_extensions.agent_swarm.extension import EXTENSION_MAPPINGS as SWARM
+    from custom_extensions.agents.extension import EXTENSION_MAPPINGS as AGENTS
+
+    known = {**KNOWN, **AGENTS["nodes"], **SWARM["nodes"]}
+    # Mirrors the live /v1/agent/events payload: two CerebrasAgents, a
+    # SwarmJoin used as a generic combiner, and a log — all unwired literals.
+    payload = {
+        "thoughts": "I will create two AI agents to generate painting ideas.",
+        "plan": [
+            "Create first AI agent to generate painting idea.",
+            "Create second AI agent to generate painting idea.",
+            "Combine the outputs of both agents into one description.",
+        ],
+        "prompt": {
+            "1": {
+                "type": "CerebrasAgent",
+                "name": "Painting Idea Generator 1",
+                "inputs": {"prompt": "describe a painting idea", "api_key": ""},
+            },
+            "2": {
+                "type": "CerebrasAgent",
+                "name": "Painting Idea Generator 2",
+                "inputs": {
+                    "prompt": "describe a different painting idea",
+                    "api_key": "",
+                },
+            },
+            "3": {
+                "type": "SwarmJoinNode",
+                "name": "Combine Painting Ideas",
+                "inputs": {"results": []},
+            },
+            "4": {
+                "type": "ConsoleLog",
+                "name": "Log Combined Idea",
+                "inputs": {"any": "combined description"},
+            },
+        },
+    }
+    result = build_graph(
+        "make two ai agents describe ideas for paintings and then combine them into one.",
+        known_nodes=known,
+        llm=lambda p: payload,
+    )
+    assert result.source == "llm"
+    types = _types(result)
+    assert "SwarmJoinNode" not in types
+    assert "ConcatString" in types
+    join = next(n for n in result.prompt.values() if n["type"] == "ConcatString")
+    log = next(n for n in result.prompt.values() if n["type"] == "ConsoleLog")
+    assert _is_edge(join["inputs"]["a"]) and _is_edge(join["inputs"]["b"])
+    assert _is_edge(log["inputs"]["any"])
+    paths = [n for n in result.prompt.values() if n["type"] == "ValuePath"]
+    assert len(paths) == 2
+    path_ids = {nid for nid, n in result.prompt.items() if n["type"] == "ValuePath"}
+    assert join["inputs"]["a"]["originId"] in path_ids
+    assert join["inputs"]["b"]["originId"] in path_ids
+    assert any("SwarmJoinNode" in r and "ConcatString" in r for r in result.repairs)
+    assert not any("no wires" in w for w in result.warnings)
+
+
 def test_llm_empty_agent_prompts_are_filled():
     from custom_extensions.agents.extension import EXTENSION_MAPPINGS as AGENTS
 
@@ -220,6 +286,245 @@ def test_llm_empty_agent_prompts_are_filled():
     assert join["inputs"]["b"]["originId"] in path_ids
 
 
+def test_offline_widget_edit_sets_matching_widget():
+    canvas = {
+        "15": {
+            "type": "CerebrasAgent",
+            "name": "CerebrasAgent",
+            "widgets": {"api_key": "", "prompt": "old"},
+        }
+    }
+    result = build_graph(
+        'set the prompt of CerebrasAgent to "describe cubist paintings"',
+        known_nodes=KNOWN,
+        canvas=canvas,
+    )
+    assert result.source == "offline"
+    assert result.prompt == {}
+    assert result.widget_edits
+    assert result.widget_edits[0]["node_id"] == "15"
+    assert result.widget_edits[0]["widget"] == "prompt"
+    assert result.widget_edits[0]["value"] == "describe cubist paintings"
+    assert result.thoughts
+
+
+def test_offline_widget_edit_skips_api_key_unless_named():
+    canvas = {
+        "1": {
+            "type": "CerebrasAgent",
+            "widgets": {"api_key": "secret", "prompt": "old"},
+        }
+    }
+    edits = offline_widget_edits('change CerebrasAgent prompt to "new idea"', canvas)
+    assert len(edits) == 1
+    assert edits[0]["widget"] == "prompt"
+
+
+def test_llm_widget_edits_only_skips_new_graph():
+    payload = {
+        "thoughts": "The existing agent prompt should mention cubism.",
+        "plan": ["Update CerebrasAgent prompt"],
+        "widget_edits": [{"node_id": "15", "widget": "prompt", "value": "cubism"}],
+    }
+    result = build_graph(
+        "change the agent prompt",
+        known_nodes=KNOWN,
+        llm=lambda p: payload,
+        canvas={"15": {"type": "CerebrasAgent", "widgets": {"prompt": "old"}}},
+    )
+    assert result.source == "llm"
+    assert result.prompt == {}
+    assert result.widget_edits[0]["value"] == "cubism"
+    assert "cubism" in result.thoughts or result.thoughts
+
+
+def test_extract_llm_payload_separates_envelope_from_graph():
+    thoughts, edits, plan, graph = extract_llm_payload(
+        {
+            "thoughts": "reason",
+            "plan": ["a"],
+            "widget_edits": [{"node_id": "1", "widget": "text", "value": "x"}],
+            "prompt": GOOD_GRAPH,
+        }
+    )
+    assert thoughts == "reason"
+    assert edits[0]["widget"] == "text"
+    assert plan == ["a"]
+    assert graph == GOOD_GRAPH
+
+
+def test_offline_if_equal_builds_wired_branches():
+    result = build_graph(
+        'if "red" equals "blue" then "happy" else "sad"',
+        known_nodes=KNOWN,
+    )
+    types = _types(result)
+    assert types.count("IfEqual") == 1
+    assert "IfEqualTrue" in types and "IfEqualFalse" in types
+    assert "EndIfEqual" in types
+    iff = next(n for n in result.prompt.values() if n["type"] == "IfEqual")
+    assert _is_edge(iff["inputs"]["a"]) and _is_edge(iff["inputs"]["b"])
+    end = next(n for n in result.prompt.values() if n["type"] == "EndIfEqual")
+    assert _is_edge(end["inputs"]["IfEqual"])
+
+
+def test_offline_for_loop_builds_wired_loop():
+    result = build_graph("loop 3 times and log the index", known_nodes=KNOWN)
+    types = _types(result)
+    assert "ForLoop" in types and "EndForLoop" in types
+    loop = next(n for n in result.prompt.values() if n["type"] == "ForLoop")
+    assert loop["inputs"]["start"] == 0
+    assert loop["inputs"]["stop"] == 3
+    end = next(n for n in result.prompt.values() if n["type"] == "EndForLoop")
+    assert _is_edge(end["inputs"]["ForLoop"])
+    assert _is_edge(end["inputs"]["node_inputs"])
+
+
+def test_offline_imports_prompt_graph_json():
+    raw = json.dumps(
+        {
+            "1": {"type": "nsString", "name": "s", "inputs": {"text": "imported"}},
+            "2": {"type": "ConsoleLog", "name": "l", "inputs": {"any": {"originId": "1"}}},
+        }
+    )
+    result = build_graph(f"please import this workflow {raw}", known_nodes=KNOWN)
+    assert "nsString" in _types(result)
+    log = next(n for n in result.prompt.values() if n["type"] == "ConsoleLog")
+    assert _is_edge(log["inputs"]["any"])
+
+
+def test_offline_imports_litegraph_workflow():
+    workflow = {
+        "nodes": [
+            {
+                "id": 6,
+                "type": "nsString",
+                "title": "s",
+                "inputs": [
+                    {"name": "in_rules", "link": None},
+                    {"name": "text", "link": None},
+                ],
+                "widgets_values": ["hello", None],
+            },
+            {
+                "id": 2,
+                "type": "ConsoleLog",
+                "title": "l",
+                "inputs": [
+                    {"name": "in_rules", "link": None},
+                    {"name": "any", "link": 4},
+                ],
+                "widgets_values": [None],
+            },
+        ],
+        "links": [[4, 6, 0, 2, 1, "*"]],
+    }
+    result = build_graph(json.dumps(workflow), known_nodes=KNOWN)
+    assert result.prompt["6"]["inputs"]["text"] == "hello"
+    assert result.prompt["2"]["inputs"]["any"] == {"originId": "6"}
+
+
+def test_offline_export_workflow_does_not_reimport_nodes():
+    canvas = {
+        "15": {
+            "type": "nsString",
+            "name": "s",
+            "widgets": {"text": "keep"},
+        }
+    }
+    result = build_graph("export this workflow", known_nodes=KNOWN, canvas=canvas)
+    assert result.prompt == {}
+    assert result.exported_workflow
+    assert result.exported_workflow["prompt"]["15"]["inputs"]["text"] == "keep"
+
+
+def test_llm_poem_loop_if_control_links_are_wired():
+    # Mirrors the live /v1/agent/events graph: dangling IfEqual.b, unwired ends.
+    payload = {
+        "1": {"type": "CerebrasAgent", "name": "Poem Generator 1", "inputs": {"prompt": "poem a"}},
+        "2": {"type": "CerebrasAgent", "name": "Poem Generator 2", "inputs": {"prompt": "poem b"}},
+        "3": {
+            "type": "ConcatString",
+            "name": "Combine Poems",
+            "inputs": {"a": {"originId": "1"}, "b": {"originId": "2"}},
+        },
+        "4": {"type": "ForLoop", "name": "Loop 3 Times", "inputs": {"start": 0, "stop": 3}},
+        "5": {
+            "type": "IfEqual",
+            "name": "Evaluate Poem",
+            "inputs": {"a": {"originId": "3"}, "b": {"originId": "LLM"}},
+        },
+        "6": {"type": "CerebrasAgent", "name": "LLM Judge", "inputs": {"prompt": "judge"}},
+        "7": {"type": "EndForLoop", "name": "End Loop", "inputs": {}},
+        "8": {"type": "EndIfEqual", "name": "End Evaluation", "inputs": {}},
+    }
+    from custom_extensions.agents.extension import EXTENSION_MAPPINGS as AGENTS
+
+    known = {**KNOWN, **AGENTS["nodes"]}
+    result = build_graph("poems and a judge", known_nodes=known, llm=lambda p: payload)
+    end_for = next(n for n in result.prompt.values() if n["type"] == "EndForLoop")
+    end_if = next(n for n in result.prompt.values() if n["type"] == "EndIfEqual")
+    iff = next(n for n in result.prompt.values() if n["type"] == "IfEqual")
+    assert _is_edge(end_for["inputs"]["ForLoop"])
+    assert _is_edge(end_if["inputs"]["IfEqual"])
+    assert not _is_unfilled_local(iff["inputs"].get("a"))
+    assert not _is_unfilled_local(iff["inputs"].get("b"))
+    assert not any(
+        "ForLoop" in w and "not provided" in w for w in result.warnings
+    )
+    assert not any(
+        "IfEqual" in w and "not provided" in w for w in result.warnings
+    )
+
+
+def _is_unfilled_local(value):
+    return value in (None, "", [], {})
+
+
+def test_llm_refines_from_lint_feedback():
+    calls = []
+    broken = {
+        "1": {"type": "nsString", "inputs": {"text": "x"}},
+        "2": {"type": "EndForLoop", "inputs": {}},
+    }
+    fixed = {
+        "1": {"type": "nsString", "inputs": {"text": "x"}},
+        "3": {"type": "ForLoop", "inputs": {"start": 0, "stop": 3, "step": 1}},
+        "2": {
+            "type": "EndForLoop",
+            "inputs": {"ForLoop": {"originId": "3"}, "node_inputs": {"originId": "1"}},
+        },
+    }
+
+    def planner(message):
+        calls.append(message)
+        if len(calls) == 1:
+            return {"plan": ["draft"], "prompt": broken}
+        return {"plan": ["fixed"], "prompt": fixed}
+
+    result = build_graph("loop and end", known_nodes=KNOWN, llm=planner)
+    assert len(calls) >= 2
+    assert any("refined" in r for r in result.repairs) or any(
+        "refined" in step for step in result.plan
+    )
+    end = next(n for n in result.prompt.values() if n["type"] == "EndForLoop")
+    assert _is_edge(end["inputs"]["ForLoop"])
+
+
+def test_llm_if_equal_skeleton_is_completed():
+    islands = {
+        "1": {"type": "nsString", "inputs": {"text": "a"}},
+        "2": {"type": "nsString", "inputs": {"text": "a"}},
+        "3": {"type": "IfEqual", "inputs": {"a": {"originId": "1"}, "b": {"originId": "2"}}},
+    }
+    result = build_graph("if they match", known_nodes=KNOWN, llm=lambda p: islands)
+    types = _types(result)
+    assert "IfEqualTrue" in types
+    assert "IfEqualFalse" in types
+    assert "EndIfEqual" in types
+    assert any("IfEqualTrue" in r for r in result.repairs)
+
+
 def test_planner_prompt_includes_registration_contracts():
     from server.domain.services.graph_builder import _planner_prompt
 
@@ -229,6 +534,11 @@ def test_planner_prompt_includes_registration_contracts():
     assert "originId" in text
     assert "ValuePath" in text
     assert "summary" in text
+    assert "widget_edits" in text
+    assert "IfEqual" in text
+    assert "ForLoop" in text
+    assert "EndWhileLoop" in text
+    assert "import" in text.lower()
 
 
 def test_make_openai_planner_none_without_key(monkeypatch):

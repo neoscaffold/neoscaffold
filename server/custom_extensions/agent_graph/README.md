@@ -37,7 +37,12 @@ Turns a natural-language prompt into a validated NeoScaffold sub-graph — the
   fills empty `prompt` literals from the user request, wires unused outputs
   into unwired required dataflow inputs, and inserts `ValuePath` nodes when a
   dict-producing agent is wired into ConcatString/ConsoleLog (default path
-  `summary`). It never invents API keys.
+  `summary`). It never invents API keys. When the request includes a `canvas`
+  snapshot, the planner can return `widget_edits` to change any existing
+  widget instead of (or in addition to) building new nodes. The prompt bar
+  keeps a conversation transcript of thoughts and outputs. When a queued run
+  fails, it asks how to fix the graph and can arm a patch
+  (`POST /v1/agent/suggest-fix`) for Accept.
 
 ## Reliability
 
