@@ -1115,15 +1115,25 @@ def make_openai_planner(
         from openai import OpenAI
 
         client = OpenAI()
-        response = client.chat.completions.create(
-            model=chosen_model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.2,
-        )
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_prompt},
+        ]
+        kwargs: Dict[str, Any] = {
+            "model": chosen_model,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+            "temperature": 0.2,
+        }
+        try:
+            response = client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            # Some models (e.g. gpt-5.6-*) only allow the default temperature.
+            if "temperature" in str(exc):
+                kwargs.pop("temperature", None)
+                response = client.chat.completions.create(**kwargs)
+            else:
+                raise
         content = response.choices[0].message.content or "{}"
         return content
 

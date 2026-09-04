@@ -20,6 +20,13 @@ from ...harness.openapi import build_openapi_spec
 from ...harness.openapi_mcp import OpenApiToolset
 from ...harness.execution_fix import suggest_execution_fix
 from ...harness.parsing import ParseError
+from ...harness.workflow_agent import (
+    WorkflowHarness,
+    make_code_suggester,
+    make_graph_executor,
+    make_graph_proposer,
+    make_llm_verifier,
+)
 
 VERSION = "1.0.0"
 
@@ -211,6 +218,57 @@ def v1_routes(server):
         }
         if result.exported_workflow is not None:
             payload["exported_workflow"] = result.exported_workflow
+        return web.json_response(payload, dumps=dumps)
+
+    @routes.post("/v1/agent/run")
+    async def run_harness_route(request):
+        """Conversational harness: build a workflow, execute it, and iterate on
+        failures until it runs (or the attempt budget is exhausted)."""
+        import asyncio as _asyncio
+
+        user_id, error = _authorized_user(request)
+        if error is not None:
+            return error
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON body"}, status=400)
+
+        request_text = (data.get("request") or data.get("prompt")) if isinstance(data, dict) else None
+        if not isinstance(request_text, str) or not request_text.strip():
+            return web.json_response(
+                {"error": "'request' must be a non-empty string"}, status=400
+            )
+        raw_workflow = data.get("workflow")
+        workflow = None
+        if isinstance(raw_workflow, dict) and raw_workflow:
+            # Accept a prompt-graph or a LiteGraph workflow; normalize to a
+            # prompt-graph so the harness gets clean context.
+            workflow = import_workflow(raw_workflow) or {
+                k: v
+                for k, v in raw_workflow.items()
+                if isinstance(v, dict) and v.get("type")
+            }
+        try:
+            max_iterations = int(data.get("max_iterations", 3))
+        except (TypeError, ValueError):
+            max_iterations = 3
+        max_iterations = max(1, min(max_iterations, 6))
+
+        verify_intent = data.get("verify", True) is not False
+        suggest_code = data.get("suggest_code", True) is not False
+        known_nodes = getattr(server, "nodes", {})
+        harness = WorkflowHarness(
+            make_graph_proposer(known_nodes, make_openai_planner(known_nodes)),
+            make_graph_executor(known_nodes),
+            verify=make_llm_verifier() if verify_intent else None,
+            suggest_code=make_code_suggester(known_nodes) if suggest_code else None,
+            max_iterations=max_iterations,
+        )
+        run = await _asyncio.to_thread(harness.run, request_text, workflow=workflow)
+        payload = run.to_dict()
+        if run.final_prompt:
+            payload["layout"] = _layout(run.final_prompt)
         return web.json_response(payload, dumps=dumps)
 
     @routes.post("/v1/agent/import-workflow")
