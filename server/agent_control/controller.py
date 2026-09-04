@@ -110,15 +110,15 @@ def run_tests(code: str, tests: List[Dict[str, str]], timeout: float) -> List[Te
     return outcomes
 
 
-def _initial_prompt(task: Dict[str, Any]) -> str:
+def _initial_prompt(task: Dict[str, Any], include_examples: bool = True) -> str:
+    base = f"Problem: {task.get('title')}\n\n{task.get('statement')}"
+    if not include_examples:
+        return base
     samples = "\n".join(
         f"Input:\n{s.get('input', '')}Output:\n{s.get('output', '')}"
         for s in task.get("public_samples", [])
     )
-    return (
-        f"Problem: {task.get('title')}\n\n{task.get('statement')}\n\n"
-        f"Examples:\n{samples}"
-    )
+    return f"{base}\n\nExamples:\n{samples}"
 
 
 def _feedback(outcome: TestOutcome) -> str:
@@ -140,12 +140,13 @@ def control_agent(
     max_attempts: int = 4,
     model_name: str = "",
     timeout: float = 8.0,
+    include_examples: bool = True,
     on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
 ) -> ControlResult:
     """Run the control loop for one task and return the outcome."""
     messages: List[Dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": _initial_prompt(task)},
+        {"role": "user", "content": _initial_prompt(task, include_examples)},
     ]
     limit = 1 if mode == "one_shot" else max(1, max_attempts)
     attempts: List[Attempt] = []

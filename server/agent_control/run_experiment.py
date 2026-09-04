@@ -28,7 +28,14 @@ def _print_stream_factory(prefix: str):
     return on_token
 
 
-def run(model_name: str, max_attempts: int, task_ids: List[str], stream: bool) -> Dict[str, Any]:
+def run(
+    model_name: str,
+    max_attempts: int,
+    task_ids: List[str],
+    stream: bool,
+    include_examples: bool = True,
+    max_tokens: int = 1200,
+) -> Dict[str, Any]:
     results: List[Dict[str, Any]] = []
     one_shot_solved = 0
     controlled_solved = 0
@@ -37,12 +44,16 @@ def run(model_name: str, max_attempts: int, task_ids: List[str], stream: bool) -
     for task_id in task_ids:
         task = get_task(task_id)
         on_token = _print_stream_factory(task_id) if stream else None
-        model = make_openai_model(model_name, on_token=on_token)
+        model = make_openai_model(model_name, max_tokens=max_tokens, on_token=on_token)
 
         t0 = time.time()
-        one = control_agent(task, model, mode="one_shot", model_name=model_name)
+        one = control_agent(
+            task, model, mode="one_shot", model_name=model_name,
+            include_examples=include_examples,
+        )
         controlled = control_agent(
-            task, model, mode="controlled", max_attempts=max_attempts, model_name=model_name
+            task, model, mode="controlled", max_attempts=max_attempts,
+            model_name=model_name, include_examples=include_examples,
         )
         elapsed = time.time() - t0
 
@@ -97,10 +108,26 @@ def main(argv=None) -> int:
     parser.add_argument("--tasks", nargs="*", default=None, help="Subset of task ids.")
     parser.add_argument("--json", default=None, help="Write full results JSON to this path.")
     parser.add_argument("--stream", action="store_true", help="Stream model tokens to stdout.")
+    parser.add_argument(
+        "--no-examples",
+        action="store_true",
+        help="Hard mode: omit worked examples from the initial prompt (the agent must "
+        "infer edge-case output formats; the control loop recovers via test feedback).",
+    )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=1200,
+        help="Per-attempt model token budget. A tight budget can truncate the first "
+        "solution; the control loop recovers via error feedback.",
+    )
     args = parser.parse_args(argv)
 
     task_ids = args.tasks or TASK_IDS
-    summary = run(args.model, args.max_attempts, task_ids, args.stream)
+    summary = run(
+        args.model, args.max_attempts, task_ids, args.stream,
+        include_examples=not args.no_examples, max_tokens=args.max_tokens,
+    )
 
     if args.json:
         with open(args.json, "w", encoding="utf-8") as handle:
