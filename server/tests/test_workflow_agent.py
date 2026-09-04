@@ -101,6 +101,25 @@ def test_diff_graphs_reports_all_change_kinds():
     assert any("bye" in line for line in summary)
 
 
+def test_diff_graphs_tolerates_non_prompt_graph_input():
+    # A raw LiteGraph workflow (list/metadata values) must not crash the diff.
+    litegraph = {"nodes": [{"id": 1}], "links": [], "version": 0.4, "config": {}}
+    diff = diff_graphs(litegraph, {"1": {"type": "nsString", "inputs": {}}})
+    assert [n["id"] for n in diff.added_nodes] == ["1"]
+    assert diff.removed_nodes == []  # metadata keys ignored, not treated as nodes
+
+
+def test_harness_tolerates_litegraph_workflow_context():
+    litegraph = {"nodes": [{"id": 1, "type": "X"}], "links": [], "version": 0.4}
+
+    def propose(request, workflow, feedback):
+        return ProposeResult(prompt={"1": {"type": "GOOD", "name": "n", "inputs": {}}})
+
+    run = WorkflowHarness(propose, _executor(), max_iterations=2).run("x", workflow=litegraph)
+    assert run.passed is True
+    assert "Added GOOD (node 1)" in run.iterations[0].change_summary
+
+
 def test_diff_graphs_reports_retype():
     diff = diff_graphs(
         {"1": {"type": "nsString", "inputs": {}}}, {"1": {"type": "nsInteger", "inputs": {}}}

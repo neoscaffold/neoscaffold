@@ -239,7 +239,16 @@ def v1_routes(server):
             return web.json_response(
                 {"error": "'request' must be a non-empty string"}, status=400
             )
-        workflow = data.get("workflow") if isinstance(data.get("workflow"), dict) else None
+        raw_workflow = data.get("workflow")
+        workflow = None
+        if isinstance(raw_workflow, dict) and raw_workflow:
+            # Accept a prompt-graph or a LiteGraph workflow; normalize to a
+            # prompt-graph so the harness gets clean context.
+            workflow = import_workflow(raw_workflow) or {
+                k: v
+                for k, v in raw_workflow.items()
+                if isinstance(v, dict) and v.get("type")
+            }
         try:
             max_iterations = int(data.get("max_iterations", 3))
         except (TypeError, ValueError):

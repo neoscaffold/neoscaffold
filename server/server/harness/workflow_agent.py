@@ -63,9 +63,17 @@ class GraphDiff:
 
 
 def diff_graphs(before: Optional[Dict[str, Any]], after: Optional[Dict[str, Any]]) -> GraphDiff:
-    """Compute a structured diff between two prompt-graphs (nodes/edges/widgets)."""
-    before = before or {}
-    after = after or {}
+    """Compute a structured diff between two prompt-graphs (nodes/edges/widgets).
+
+    Only dict-valued entries are treated as nodes, so a raw LiteGraph workflow
+    (with list/metadata values) or any non-prompt-graph input is tolerated.
+    """
+    before = {
+        k: v for k, v in (before or {}).items() if isinstance(v, dict) and v.get("type")
+    }
+    after = {
+        k: v for k, v in (after or {}).items() if isinstance(v, dict) and v.get("type")
+    }
     before_ids, after_ids = set(before), set(after)
 
     added_nodes = sorted(
