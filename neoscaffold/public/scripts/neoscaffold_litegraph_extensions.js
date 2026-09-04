@@ -4331,9 +4331,18 @@
             const created = (run.final_prompt && Object.keys(run.final_prompt).length)
               ? scope.importPromptGraph({ prompt: run.final_prompt, layout: run.layout || {} })
               : 0;
-            const trace = (run.iterations || []).map(
-              (it) => `#${it.index}: ${it.node_count} node(s) ${it.execution_ok ? 'ran OK' : 'failed'}`,
-            );
+            const trace = (run.iterations || []).map((it) => {
+              if (!it.execution_ok) {
+                return `#${it.index}: ${it.node_count} node(s) failed to run`;
+              }
+              const intent =
+                it.intent_met === true
+                  ? 'intent met'
+                  : it.intent_met === false
+                    ? 'intent not met'
+                    : 'ran OK';
+              return `#${it.index}: ${it.node_count} node(s) ran OK, ${intent}`;
+            });
             const outputs = Object.values(run.final_outputs || {})
               .map((v) => String(v))
               .filter(Boolean)

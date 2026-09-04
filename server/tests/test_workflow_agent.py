@@ -4,6 +4,7 @@ from custom_extensions.core.extension import EXTENSION_MAPPINGS as CORE
 from custom_extensions.network_requests.extension import EXTENSION_MAPPINGS as NET
 from server.harness.workflow_agent import (
     ProposeResult,
+    VerifyResult,
     WorkflowHarness,
     make_graph_executor,
     make_graph_proposer,
@@ -69,6 +70,74 @@ def test_harness_gives_up_after_max_iterations():
     assert run.passed is False
     assert run.iterations_used == 3
     assert run.final_outputs == {}
+
+
+# --- intent verification ---
+def _always_good_proposer():
+    seen = {"feedbacks": []}
+
+    def propose(request, workflow, feedback):
+        seen["feedbacks"].append(feedback)
+        return ProposeResult(prompt={"1": {"type": "GOOD", "name": "n", "inputs": {}}}, thoughts="t")
+
+    return propose, seen
+
+
+def test_harness_iterates_until_intent_met():
+    propose, seen = _always_good_proposer()
+    verdicts = iter(
+        [VerifyResult(met=False, reason="output is wrong"), VerifyResult(met=True, reason="correct")]
+    )
+
+    def verify(request, prompt, outputs):
+        return next(verdicts)
+
+    run = WorkflowHarness(propose, _executor(), verify=verify, max_iterations=4).run("x")
+    assert run.passed is True
+    assert run.iterations_used == 2
+    assert run.intent_met is True
+    # execution succeeded both times, but intent gated the first
+    assert run.iterations[0].execution_ok is True
+    assert run.iterations[0].intent_met is False
+    assert run.iterations[1].intent_met is True
+    # the intent failure was fed back to the second proposal
+    assert seen["feedbacks"][1] and "did NOT meet" in seen["feedbacks"][1]
+
+
+def test_harness_without_verifier_passes_on_execution():
+    def propose(request, workflow, feedback):
+        return ProposeResult(prompt={"1": {"type": "GOOD", "name": "n", "inputs": {}}})
+
+    run = WorkflowHarness(propose, _executor(), verify=None, max_iterations=3).run("x")
+    assert run.passed is True
+    assert run.iterations_used == 1
+    assert run.intent_met is True
+
+
+def test_harness_gives_up_when_intent_never_met():
+    def propose(request, workflow, feedback):
+        return ProposeResult(prompt={"1": {"type": "GOOD", "name": "n", "inputs": {}}})
+
+    def verify(request, prompt, outputs):
+        return VerifyResult(met=False, reason="never right")
+
+    run = WorkflowHarness(propose, _executor(), verify=verify, max_iterations=3).run("x")
+    assert run.passed is False
+    assert run.iterations_used == 3
+    assert run.intent_met is False
+    assert run.final_outputs == {}
+
+
+def test_verifier_exception_does_not_crash_run():
+    def propose(request, workflow, feedback):
+        return ProposeResult(prompt={"1": {"type": "GOOD", "name": "n", "inputs": {}}})
+
+    def verify(request, prompt, outputs):
+        raise RuntimeError("judge down")
+
+    run = WorkflowHarness(propose, _executor(), verify=verify, max_iterations=2).run("x")
+    assert run.passed is True  # accepts on verifier error
+    assert run.iterations_used == 1
 
 
 # --- real executor bridge ---

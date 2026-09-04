@@ -38,6 +38,12 @@ class ExecResult:
 
 
 @dataclass
+class VerifyResult:
+    met: bool
+    reason: str = ""
+
+
+@dataclass
 class Iteration:
     index: int
     thoughts: str
@@ -46,6 +52,8 @@ class Iteration:
     execution_ok: bool
     node_errors: List[Dict[str, Any]]
     feedback: str = ""
+    intent_met: Optional[bool] = None
+    verify_reason: str = ""
 
 
 @dataclass
@@ -58,6 +66,8 @@ class HarnessRun:
     final_outputs: Dict[str, Any]
     iterations: List[Iteration] = field(default_factory=list)
     reply: str = ""
+    intent_met: Optional[bool] = None
+    intent_reason: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -69,6 +79,8 @@ class HarnessRun:
             "final_outputs": self.final_outputs,
             "iterations": [asdict(it) for it in self.iterations],
             "reply": self.reply,
+            "intent_met": self.intent_met,
+            "intent_reason": self.intent_reason,
         }
 
 
@@ -76,6 +88,8 @@ class HarnessRun:
 ProposeFn = Callable[[str, Dict[str, Any], Optional[str]], ProposeResult]
 # execute(prompt_graph) -> ExecResult
 ExecuteFn = Callable[[Dict[str, Any]], ExecResult]
+# verify(request, prompt_graph, outputs) -> VerifyResult
+VerifyFn = Callable[[str, Dict[str, Any], Dict[str, Any]], VerifyResult]
 
 
 def execution_feedback(ex: ExecResult) -> str:
@@ -97,9 +111,17 @@ def execution_feedback(ex: ExecResult) -> str:
 class WorkflowHarness:
     """Iterate on a workflow and its executions from a conversational request."""
 
-    def __init__(self, propose: ProposeFn, execute: ExecuteFn, *, max_iterations: int = 3):
+    def __init__(
+        self,
+        propose: ProposeFn,
+        execute: ExecuteFn,
+        *,
+        verify: Optional[VerifyFn] = None,
+        max_iterations: int = 3,
+    ):
         self.propose = propose
         self.execute = execute
+        self.verify = verify
         self.max_iterations = max(1, max_iterations)
 
     def run(self, request: str, *, workflow: Optional[Dict[str, Any]] = None) -> HarnessRun:
@@ -108,6 +130,8 @@ class WorkflowHarness:
         iterations: List[Iteration] = []
         passed = False
         final_outputs: Dict[str, Any] = {}
+        intent_met: Optional[bool] = None
+        intent_reason = ""
 
         span = AGENT_EVENTS.start("harness", request[:80], detail={"request": request})
 
@@ -124,30 +148,54 @@ class WorkflowHarness:
                 stream(f"[harness] plan: {proposal.thoughts}\n")
             stream(f"[harness] iteration {index}: executing {len(current)} node(s)...\n")
             ex = self.execute(current)
-            fb = "" if ex.ok else execution_feedback(ex)
-            iterations.append(
-                Iteration(
-                    index=index,
-                    thoughts=proposal.thoughts,
-                    plan=proposal.plan,
-                    node_count=len(current),
-                    execution_ok=ex.ok,
-                    node_errors=ex.node_errors,
-                    feedback=fb,
-                )
+
+            iteration = Iteration(
+                index=index,
+                thoughts=proposal.thoughts,
+                plan=proposal.plan,
+                node_count=len(current),
+                execution_ok=ex.ok,
+                node_errors=ex.node_errors,
             )
-            if ex.ok:
-                stream(f"[harness] iteration {index}: execution OK\n")
+            iterations.append(iteration)
+
+            if not ex.ok:
+                fb = execution_feedback(ex)
+                iteration.feedback = fb
+                feedback = fb
+                stream(f"[harness] iteration {index}: execution failed — {fb}\n")
+                continue
+
+            stream(f"[harness] iteration {index}: execution OK; verifying intent...\n")
+            final_outputs = ex.outputs
+            if self.verify is None:
+                intent_met, intent_reason = True, "no verifier configured; execution succeeded"
+            else:
+                try:
+                    verdict = self.verify(request, current, ex.outputs)
+                except Exception as exc:  # never let the judge crash the run
+                    verdict = VerifyResult(met=True, reason=f"verifier error, accepting: {exc}")
+                intent_met, intent_reason = verdict.met, verdict.reason
+            iteration.intent_met = intent_met
+            iteration.verify_reason = intent_reason
+
+            if intent_met:
+                stream(f"[harness] iteration {index}: intent met — {intent_reason}\n")
                 passed = True
-                final_outputs = ex.outputs
                 break
+
+            fb = (
+                f"The workflow executed but did NOT meet the request: {intent_reason}. "
+                "Adjust the workflow so the final logged output satisfies the request."
+            )
+            iteration.feedback = fb
             feedback = fb
-            stream(f"[harness] iteration {index}: {fb}\n")
+            stream(f"[harness] iteration {index}: intent NOT met — {intent_reason}\n")
 
         AGENT_EVENTS.finish(
             span,
             status="succeeded" if passed else "failed",
-            detail={"iterations": len(iterations), "passed": passed},
+            detail={"iterations": len(iterations), "passed": passed, "intent_met": intent_met},
         )
         observability.inc(
             "neoscaffold_harness_runs_total",
@@ -160,16 +208,18 @@ class WorkflowHarness:
             help="Iterations used by the workflow harness",
         )
 
-        reply = iterations[-1].thoughts if iterations else ""
+        reply = intent_reason or (iterations[-1].thoughts if iterations else "")
         return HarnessRun(
             request=request,
             passed=passed,
             iterations_used=len(iterations),
             max_iterations=self.max_iterations,
             final_prompt=current,
-            final_outputs=final_outputs,
+            final_outputs=final_outputs if passed else {},
             iterations=iterations,
             reply=reply,
+            intent_met=intent_met,
+            intent_reason=intent_reason,
         )
 
 
@@ -235,6 +285,59 @@ def make_graph_executor(known_nodes: Mapping[str, Any]) -> ExecuteFn:
         return run_prompt_graph(prompt, known_nodes)
 
     return execute
+
+
+def make_llm_verifier(model: Optional[str] = None) -> Optional[VerifyFn]:
+    """LLM-as-judge intent verifier (or ``None`` when no key is configured).
+
+    Given the request and the workflow's execution outputs, decide whether the
+    result satisfies the user's intent. Returns ``VerifyResult(met, reason)``.
+    """
+    import json
+    import os
+
+    if os.environ.get("NEOSCAFFOLD_GRAPH_OFFLINE", "").lower() in ("1", "true", "yes"):
+        return None
+    if not os.environ.get("OPENAI_API_KEY"):
+        return None
+
+    chosen_model = model or os.environ.get("NEOSCAFFOLD_GRAPH_MODEL", "gpt-5.6-terra")
+
+    def verify(request: str, prompt: Dict[str, Any], outputs: Dict[str, Any]) -> VerifyResult:
+        from openai import OpenAI
+
+        client = OpenAI()
+        # Prefer the terminal (sink) node outputs; include all, truncated.
+        rendered = {str(k): str(v)[:400] for k, v in (outputs or {}).items()}
+        system = (
+            "You verify whether a built workflow satisfied a user's request. "
+            "You are given the request and the workflow's node outputs "
+            "(node_id -> produced value). Judge whether the FINAL/most relevant "
+            "output satisfies the request. Be strict about the actual value, not "
+            "just that something ran. Respond ONLY with JSON: "
+            '{"met": true|false, "reason": "one concise sentence"}.'
+        )
+        user = (
+            f"Request:\n{request}\n\nWorkflow node outputs:\n{json.dumps(rendered)}\n"
+        )
+        try:
+            response = client.chat.completions.create(
+                model=chosen_model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                response_format={"type": "json_object"},
+                max_completion_tokens=200,
+            )
+            content = response.choices[0].message.content or "{}"
+            data = json.loads(content)
+            return VerifyResult(met=bool(data.get("met")), reason=str(data.get("reason", "")))
+        except Exception as exc:
+            # If the judge fails, accept (don't block a runnable workflow).
+            return VerifyResult(met=True, reason=f"verifier unavailable, accepting: {exc}")
+
+    return verify
 
 
 def make_graph_proposer(
