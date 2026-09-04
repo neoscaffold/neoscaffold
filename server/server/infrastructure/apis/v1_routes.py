@@ -22,6 +22,7 @@ from ...harness.execution_fix import suggest_execution_fix
 from ...harness.parsing import ParseError
 from ...harness.workflow_agent import (
     WorkflowHarness,
+    make_code_suggester,
     make_graph_executor,
     make_graph_proposer,
     make_llm_verifier,
@@ -246,11 +247,13 @@ def v1_routes(server):
         max_iterations = max(1, min(max_iterations, 6))
 
         verify_intent = data.get("verify", True) is not False
+        suggest_code = data.get("suggest_code", True) is not False
         known_nodes = getattr(server, "nodes", {})
         harness = WorkflowHarness(
             make_graph_proposer(known_nodes, make_openai_planner(known_nodes)),
             make_graph_executor(known_nodes),
             verify=make_llm_verifier() if verify_intent else None,
+            suggest_code=make_code_suggester(known_nodes) if suggest_code else None,
             max_iterations=max_iterations,
         )
         run = await _asyncio.to_thread(harness.run, request_text, workflow=workflow)

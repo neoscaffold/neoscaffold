@@ -4247,6 +4247,29 @@
               output.textContent = turn.output;
               wrap.appendChild(output);
             }
+            if ((turn.codeSuggestions || []).length) {
+              turn.codeSuggestions.forEach((suggestion) => {
+                const block = document.createElement('details');
+                block.className = 'npb-code-suggestion';
+                block.setAttribute('data-test-prompt-code-suggestion', '');
+                const summaryEl = document.createElement('summary');
+                summaryEl.className = 'npb-code-summary';
+                summaryEl.textContent =
+                  `Suggested code update to ${suggestion.node_type} (review before applying)`;
+                block.appendChild(summaryEl);
+                if (suggestion.rationale) {
+                  const why = document.createElement('div');
+                  why.className = 'npb-code-rationale';
+                  why.textContent = suggestion.rationale;
+                  block.appendChild(why);
+                }
+                const pre = document.createElement('pre');
+                pre.className = 'npb-code';
+                pre.textContent = suggestion.suggested_code || '';
+                block.appendChild(pre);
+                wrap.appendChild(block);
+              });
+            }
             if (turn.error) {
               wrap.classList.add('npb-turn-error');
               const err = document.createElement('div');
@@ -4332,16 +4355,18 @@
               ? scope.importPromptGraph({ prompt: run.final_prompt, layout: run.layout || {} })
               : 0;
             const trace = (run.iterations || []).map((it) => {
+              const changes = (it.change_summary || []).join('; ') || 'no graph changes';
+              let result;
               if (!it.execution_ok) {
-                return `#${it.index}: ${it.node_count} node(s) failed to run`;
+                result = 'failed to run';
+              } else if (it.intent_met === false) {
+                result = 'ran, intent not met';
+              } else if (it.intent_met === true) {
+                result = 'ran, intent met';
+              } else {
+                result = 'ran OK';
               }
-              const intent =
-                it.intent_met === true
-                  ? 'intent met'
-                  : it.intent_met === false
-                    ? 'intent not met'
-                    : 'ran OK';
-              return `#${it.index}: ${it.node_count} node(s) ran OK, ${intent}`;
+              return `#${it.index}: ${changes} → ${result}`;
             });
             const outputs = Object.values(run.final_outputs || {})
               .map((v) => String(v))
@@ -4358,6 +4383,7 @@
               thoughts: run.reply || '',
               plan: trace,
               output: summaryText,
+              codeSuggestions: run.code_suggestions || [],
             });
             renderTranscript();
             result.innerHTML = '';

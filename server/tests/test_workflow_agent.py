@@ -3,12 +3,16 @@
 from custom_extensions.core.extension import EXTENSION_MAPPINGS as CORE
 from custom_extensions.network_requests.extension import EXTENSION_MAPPINGS as NET
 from server.harness.workflow_agent import (
+    CodeSuggestion,
     ProposeResult,
     VerifyResult,
     WorkflowHarness,
+    diff_graphs,
+    get_node_source,
     make_graph_executor,
     make_graph_proposer,
     run_prompt_graph,
+    summarize_diff,
 )
 
 KNOWN = {**CORE["nodes"], **NET["nodes"]}
@@ -70,6 +74,104 @@ def test_harness_gives_up_after_max_iterations():
     assert run.passed is False
     assert run.iterations_used == 3
     assert run.final_outputs == {}
+
+
+# --- graph change communication (diff) ---
+def test_diff_graphs_reports_all_change_kinds():
+    before = {
+        "1": {"type": "nsString", "name": "s", "inputs": {"text": "hi"}},
+        "2": {"type": "ConsoleLog", "name": "log", "inputs": {"any": {"originId": "1"}}},
+    }
+    after = {
+        "1": {"type": "nsString", "name": "s", "inputs": {"text": "bye"}},  # widget change
+        "3": {"type": "StringToUpper", "name": "up", "inputs": {"text": {"originId": "1"}}},  # added + edge
+    }
+    diff = diff_graphs(before, after)
+    assert [n["id"] for n in diff.added_nodes] == ["3"]
+    assert [n["id"] for n in diff.removed_nodes] == ["2"]
+    assert any(w["id"] == "1" and w["to"] == "bye" for w in diff.widget_changes)
+    assert {"target": "3", "input": "text", "originId": "1"} in diff.added_edges
+    assert {"target": "2", "input": "any", "originId": "1"} in diff.removed_edges
+
+    summary = summarize_diff(diff)
+    joined = " | ".join(summary)
+    assert "Added StringToUpper (node 3)" in summary
+    assert "Removed ConsoleLog (node 2)" in summary
+    assert "Wired node 3.text ← node 1" in joined
+    assert any("bye" in line for line in summary)
+
+
+def test_diff_graphs_reports_retype():
+    diff = diff_graphs(
+        {"1": {"type": "nsString", "inputs": {}}}, {"1": {"type": "nsInteger", "inputs": {}}}
+    )
+    assert diff.retyped_nodes == [{"id": "1", "from": "nsString", "to": "nsInteger"}]
+    assert "Changed node 1 type: nsString → nsInteger" in summarize_diff(diff)
+
+
+def test_harness_communicates_graph_changes_per_iteration():
+    graphs = [
+        {"1": {"type": "BAD", "name": "n", "inputs": {}}},
+        {"2": {"type": "GOOD", "name": "n", "inputs": {}}},
+    ]
+    seq = iter(graphs)
+
+    def propose(request, workflow, feedback):
+        return ProposeResult(prompt=next(seq))
+
+    run = WorkflowHarness(propose, _executor(), max_iterations=2).run("x")
+    # iter 1 added node 1; iter 2 added node 2 and removed node 1
+    assert "Added BAD (node 1)" in run.iterations[0].change_summary
+    assert "Added GOOD (node 2)" in run.iterations[1].change_summary
+    assert "Removed BAD (node 1)" in run.iterations[1].change_summary
+    assert run.change_summary == run.iterations[-1].change_summary
+
+
+# --- suggested code updates to node implementations ---
+def test_get_node_source_returns_class_source():
+    src = get_node_source(KNOWN, "nsString")
+    assert src and "class nsString" in src and "def evaluate" in src
+
+
+def test_harness_suggests_code_on_failure():
+    def propose(request, workflow, feedback):
+        return ProposeResult(prompt={"1": {"type": "BAD", "name": "n", "inputs": {}}})
+
+    def always_fail(prompt):
+        from server.harness.workflow_agent import ExecResult
+
+        return ExecResult(ok=False, error="BAD.evaluate raised ValueError")
+
+    calls = {"n": 0}
+
+    def suggest(request, prompt, error):
+        calls["n"] += 1
+        return CodeSuggestion(
+            node_type="BAD",
+            rationale="guard the None case in evaluate",
+            current_code="class BAD: ...",
+            suggested_code="class BAD:\n    def evaluate(self, i): return ''",
+        )
+
+    run = WorkflowHarness(propose, always_fail, suggest_code=suggest, max_iterations=2).run("x")
+    assert run.passed is False
+    # code suggestion produced once, after the loop
+    assert calls["n"] == 1
+    assert run.code_suggestions and run.code_suggestions[0]["node_type"] == "BAD"
+    assert "guard the None case" in run.code_suggestions[0]["rationale"]
+    assert run.iterations[-1].code_suggestions == run.code_suggestions
+
+
+def test_harness_no_code_suggestion_on_success():
+    def propose(request, workflow, feedback):
+        return ProposeResult(prompt={"1": {"type": "GOOD", "name": "n", "inputs": {}}})
+
+    def suggest(request, prompt, error):
+        raise AssertionError("should not be called on success")
+
+    run = WorkflowHarness(propose, _executor(), suggest_code=suggest, max_iterations=2).run("x")
+    assert run.passed is True
+    assert run.code_suggestions == []
 
 
 # --- intent verification ---
