@@ -203,6 +203,24 @@
       return this.parseJsonResponse(response);
     },
 
+    // v1 agent API: conversational harness that builds a workflow, executes it,
+    // and iterates on execution failures.
+    async runHarness(request, extras) {
+      const authorizationHeaders = await this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+      const payload = extras || {};
+      const response = await fetch(`${this.baseURL}/v1/agent/run`, {
+        method: 'POST',
+        headers: authorizationHeaders,
+        body: JSON.stringify({
+          request: request,
+          workflow: payload.workflow || {},
+          max_iterations: payload.max_iterations || 3,
+        }),
+      });
+      return this.parseJsonResponse(response);
+    },
+
     async suggestExecutionFix(payload) {
       const authorizationHeaders = await this.getAuthorizationHeaders();
       authorizationHeaders['Content-Type'] = 'application/json';
@@ -4143,7 +4161,18 @@
       result.classList.add('npb-result');
       result.style.display = 'none';
 
+      const harnessLabel = document.createElement('label');
+      harnessLabel.className = 'npb-harness-toggle';
+      harnessLabel.title =
+        'Iterate: build the workflow, execute it, and refine on execution errors.';
+      const harnessToggle = document.createElement('input');
+      harnessToggle.type = 'checkbox';
+      harnessToggle.setAttribute('data-test-prompt-harness', '');
+      harnessLabel.appendChild(harnessToggle);
+      harnessLabel.appendChild(document.createTextNode(' Iterate'));
+
       form.appendChild(input);
+      form.appendChild(harnessLabel);
       form.appendChild(button);
       body.appendChild(transcript);
       body.appendChild(form);
@@ -4296,6 +4325,39 @@
             workflowSnapshot = await scope.graphToPrompt(scope.graph);
           } catch (error) {
             workflowSnapshot = {};
+          }
+          if (harnessToggle.checked) {
+            const run = await scope.api.runHarness(text, { workflow: workflowSnapshot });
+            const created = (run.final_prompt && Object.keys(run.final_prompt).length)
+              ? scope.importPromptGraph({ prompt: run.final_prompt, layout: run.layout || {} })
+              : 0;
+            const trace = (run.iterations || []).map(
+              (it) => `#${it.index}: ${it.node_count} node(s) ${it.execution_ok ? 'ran OK' : 'failed'}`,
+            );
+            const outputs = Object.values(run.final_outputs || {})
+              .map((v) => String(v))
+              .filter(Boolean)
+              .slice(0, 4)
+              .join(' | ');
+            const summaryText =
+              `Harness ${run.passed ? 'succeeded' : 'stopped'} after ` +
+              `${run.iterations_used} iteration(s)` +
+              (created ? `, loaded ${created} node(s)` : '') +
+              (outputs ? `. Output: ${outputs}` : '.');
+            conversation.push({
+              role: 'assistant',
+              thoughts: run.reply || '',
+              plan: trace,
+              output: summaryText,
+            });
+            renderTranscript();
+            result.innerHTML = '';
+            const harnessSummary = document.createElement('div');
+            harnessSummary.classList.add('npb-summary');
+            harnessSummary.textContent = summaryText;
+            result.appendChild(harnessSummary);
+            result.style.display = 'block';
+            return;
           }
           const build = await scope.api.buildGraphFromPrompt(text, {
             canvas: scope.snapshotCanvasWidgets(),

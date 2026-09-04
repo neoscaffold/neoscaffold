@@ -179,6 +179,17 @@
     }
   }
 
+  .npb-harness-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    opacity: 0.85;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
   .npb-submit {
     padding: 10px 16px;
     border: none;
