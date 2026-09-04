@@ -3074,18 +3074,31 @@
       if (!isFinite(minX)) {
         return;
       }
-      const pad = 80;
+      const pad = 40;
       const width = canvas.canvas.width;
       const height = canvas.canvas.height;
+      // Reserve space for chrome that overlays the canvas so nodes are never
+      // clipped: the bottom toolbar + prompt bar sit over the lower canvas edge,
+      // and the side panels hug the top corners.
+      const reserveTop = 24;
+      const reserveBottom = 150;
+      const reserveLeft = 24;
+      const reserveRight = 24;
+      const viewWidth = Math.max(80, width - reserveLeft - reserveRight);
+      const viewHeight = Math.max(80, height - reserveTop - reserveBottom);
       const graphWidth = maxX - minX + pad * 2;
       const graphHeight = maxY - minY + pad * 2;
-      let scale = Math.min(width / graphWidth, height / graphHeight);
+      let scale = Math.min(viewWidth / graphWidth, viewHeight / graphHeight);
       scale = Math.max(0.15, Math.min(scale, 1));
       const centerX = (minX + maxX) / 2;
       const centerY = (minY + maxY) / 2;
+      // Center the graph within the visible region (above the bottom toolbar),
+      // not the full canvas rectangle.
+      const targetScreenX = reserveLeft + viewWidth / 2;
+      const targetScreenY = reserveTop + viewHeight / 2;
       canvas.ds.scale = scale;
-      canvas.ds.offset[0] = width / (2 * scale) - centerX;
-      canvas.ds.offset[1] = height / (2 * scale) - centerY;
+      canvas.ds.offset[0] = targetScreenX / scale - centerX;
+      canvas.ds.offset[1] = targetScreenY / scale - centerY;
       if (canvas.setDirty) {
         canvas.setDirty(true, true);
       }
