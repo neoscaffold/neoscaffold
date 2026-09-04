@@ -4368,16 +4368,26 @@
               }
               return `#${it.index}: ${changes} → ${result}`;
             });
-            const outputs = Object.values(run.final_outputs || {})
-              .map((v) => String(v))
-              .filter(Boolean)
-              .slice(0, 4)
-              .join(' | ');
+            // Communicate the terminal (sink) result — prefer a ConsoleLog
+            // node's output — rather than arbitrary intermediate node values.
+            const finalPrompt = run.final_prompt || {};
+            const finalOutputs = run.final_outputs || {};
+            const logIds = Object.keys(finalPrompt).filter(
+              (id) => (finalPrompt[id] || {}).type === 'ConsoleLog',
+            );
+            const outputKeys = Object.keys(finalOutputs);
+            const pickId = logIds.length
+              ? logIds[logIds.length - 1]
+              : outputKeys[outputKeys.length - 1];
+            const finalValue =
+              pickId != null && finalOutputs[pickId] != null
+                ? String(finalOutputs[pickId])
+                : '';
             const summaryText =
               `Harness ${run.passed ? 'succeeded' : 'stopped'} after ` +
               `${run.iterations_used} iteration(s)` +
               (created ? `, loaded ${created} node(s)` : '') +
-              (outputs ? `. Output: ${outputs}` : '.');
+              (finalValue ? `. Result: ${finalValue}` : '.');
             conversation.push({
               role: 'assistant',
               thoughts: run.reply || '',
