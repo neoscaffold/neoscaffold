@@ -15,7 +15,7 @@ OPENAPI_VERSION = "3.1.0"
 
 def build_openapi_spec(server: Optional[Any] = None) -> Dict[str, Any]:
     """Return the OpenAPI document describing the NeoScaffold API."""
-    version = "1.0.0"
+    version = "1.0.1"
     if server is not None:
         version = str(getattr(server, "VERSION", version) or version)
 
@@ -129,6 +129,76 @@ def build_openapi_spec(server: Optional[Any] = None) -> Dict[str, Any]:
                         },
                         "400": {"description": "Invalid request."},
                         "422": {"description": "Prompt could not be parsed into a graph."},
+                    },
+                }
+            },
+            "/v1/agent/run": {
+                "post": {
+                    "operationId": "runHarness",
+                    "summary": "Conversational workflow harness: build, execute, verify, and refine.",
+                    "description": (
+                        "Runs the execution-in-the-loop harness for a natural-language "
+                        "request: it proposes a workflow, executes it, verifies the "
+                        "result against the user's intent (LLM judge), and refines on "
+                        "failure or unmet intent until it both runs and satisfies the "
+                        "request (or the attempt budget is exhausted). Each iteration "
+                        "reports a structured graph diff, and when the graph alone "
+                        "cannot satisfy the request the harness returns review-only "
+                        "code-update suggestions for the implicated node(s)."
+                    ),
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["request"],
+                                    "properties": {
+                                        "request": {
+                                            "type": "string",
+                                            "description": "Natural-language description of what the workflow should do.",
+                                        },
+                                        "workflow": {
+                                            "type": "object",
+                                            "description": (
+                                                "Optional current workflow as context: a "
+                                                "prompt-graph or a LiteGraph serialize() "
+                                                "payload. Normalized to a prompt-graph."
+                                            ),
+                                            "additionalProperties": True,
+                                        },
+                                        "max_iterations": {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 6,
+                                            "default": 3,
+                                            "description": "Maximum build/execute/verify attempts.",
+                                        },
+                                        "verify": {
+                                            "type": "boolean",
+                                            "default": True,
+                                            "description": "Gate success on LLM intent verification.",
+                                        },
+                                        "suggest_code": {
+                                            "type": "boolean",
+                                            "default": True,
+                                            "description": "Return node code-update suggestions when the graph can't satisfy the request.",
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "The harness run: outcome, per-iteration diffs, final workflow, and any code suggestions.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/HarnessRun"}
+                                }
+                            },
+                        },
+                        "400": {"description": "Missing or invalid 'request'."},
                     },
                 }
             },
@@ -364,6 +434,81 @@ def build_openapi_spec(server: Optional[Any] = None) -> Dict[str, Any]:
                         "started_at": {"type": "number"},
                         "ended_at": {"type": ["number", "null"]},
                         "detail": {"type": "object"},
+                    },
+                },
+                "CodeSuggestion": {
+                    "type": "object",
+                    "description": "A review-only suggested code update to a node's implementation class.",
+                    "properties": {
+                        "node_type": {"type": "string"},
+                        "rationale": {"type": "string"},
+                        "current_code": {"type": "string"},
+                        "suggested_code": {"type": "string"},
+                    },
+                },
+                "HarnessIteration": {
+                    "type": "object",
+                    "description": "One build/execute/verify attempt of the harness loop.",
+                    "properties": {
+                        "index": {"type": "integer"},
+                        "thoughts": {"type": "string"},
+                        "plan": {"type": "array", "items": {"type": "string"}},
+                        "node_count": {"type": "integer"},
+                        "execution_ok": {"type": "boolean"},
+                        "node_errors": {"type": "array", "items": {"type": "object"}},
+                        "feedback": {"type": "string"},
+                        "intent_met": {"type": ["boolean", "null"]},
+                        "verify_reason": {"type": "string"},
+                        "changes": {
+                            "type": "object",
+                            "description": "Structured graph diff versus the previous iteration.",
+                            "additionalProperties": True,
+                        },
+                        "change_summary": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Human-readable summary of this iteration's graph changes.",
+                        },
+                        "code_suggestions": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/CodeSuggestion"},
+                        },
+                    },
+                },
+                "HarnessRun": {
+                    "type": "object",
+                    "description": "Result of a conversational workflow harness run.",
+                    "properties": {
+                        "request": {"type": "string"},
+                        "passed": {
+                            "type": "boolean",
+                            "description": "Whether the workflow ran and (if verified) met the intent.",
+                        },
+                        "iterations_used": {"type": "integer"},
+                        "max_iterations": {"type": "integer"},
+                        "final_prompt": {"$ref": "#/components/schemas/PromptGraph"},
+                        "final_outputs": {
+                            "type": "object",
+                            "description": "node_id -> output value from the final execution.",
+                            "additionalProperties": True,
+                        },
+                        "layout": {
+                            "type": "object",
+                            "description": "Suggested canvas layout for final_prompt.",
+                            "additionalProperties": True,
+                        },
+                        "iterations": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/HarnessIteration"},
+                        },
+                        "reply": {"type": "string"},
+                        "intent_met": {"type": ["boolean", "null"]},
+                        "intent_reason": {"type": "string"},
+                        "change_summary": {"type": "array", "items": {"type": "string"}},
+                        "code_suggestions": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/CodeSuggestion"},
+                        },
                     },
                 },
             }

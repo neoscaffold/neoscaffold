@@ -1,8 +1,11 @@
-"""Versioned v1 HTTP surface for NeoScaffold 1.0.0.
+"""Versioned v1 HTTP surface for NeoScaffold 1.0.1.
 
 Additive, backward-compatible routes:
 
 - ``POST /v1/agent/build-graph`` — natural language -> validated prompt-graph.
+- ``POST /v1/agent/run``         — conversational harness: build -> execute ->
+  verify intent -> refine, communicating a per-iteration graph diff and any
+  suggested node-code updates.
 - ``POST /v1/agent/suggest-fix`` — run-error -> accept-ready graph patch.
 - ``GET  /v1/metrics``           — Prometheus text exposition (PromQL).
 - ``GET  /v1/healthz``           — liveness + loaded node/extension counts.
@@ -28,7 +31,7 @@ from ...harness.workflow_agent import (
     make_llm_verifier,
 )
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 
 def _authorized_user(request):
