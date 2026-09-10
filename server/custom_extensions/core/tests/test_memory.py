@@ -1,49 +1,63 @@
 from ..extension import MemoryWrite, MemoryRead
+
+
+def _inputs(key, value=None):
+    """Build a node_inputs payload matching the executor's shape."""
+    required = {"key": {"values": key}}
+    if value is not None:
+        required["value"] = {"values": value}
+    return {"required_inputs": required}
+
+
 ##########################
 # TEST class MemoryWrite:
 ##########################
 def test_memory_write():
-    # Create an instance of MemoryWrite
+    # The executor injects a shared per-execution `_memory` store onto each
+    # node instance; mirror that here.
+    memory = {}
     memory_write = MemoryWrite()
+    memory_write._memory = memory
 
-    # Define test inputs
-    test_inputs = {
-        "required_inputs": {
-            "key": {"values": "test_key"},
-            "value": {"values": "test_value"}
-        }
-    }
+    result = memory_write.evaluate(_inputs("test_key", "test_value"))
 
-    # Call the evaluate method with the test inputs
-    result = memory_write.evaluate(test_inputs)
+    # The write node echoes the key/value it stored...
+    assert result == {"key": "test_key", "value": "test_value"}
+    # ...and persists it into the shared memory store.
+    assert memory == {"test_key": "test_value"}
 
-    # Check if the result is as expected
-    expected_output = {"test_key": "test_value"}
-    assert result == expected_output, f"Expected {expected_output}, but got {result}"
 
-    print("MemoryWrite test passed! ......")
-
-# Run the test
-# test_memory_write()
-# ##########################
-
+##########################
+# TEST class MemoryRead:
+##########################
 def test_memory_read():
-    # Create an instance of MemoryWrite
+    # A prior write in the same execution populated the shared store.
+    memory = {"test_key": "test_value"}
     memory_read = MemoryRead()
+    memory_read._memory = memory
 
-    # Define test inputs
-    test_inputs = {
-        "required_inputs": {
-            "key": {"values": "test_key"},
-            "value": {"values": "test_value"}
-        }
-    }
+    result = memory_read.evaluate(_inputs("test_key"))
 
-    # Call the evaluate method with the test inputs
-    result = memory_read.evaluate(test_inputs)
+    # The read node returns the stored value for the given key.
+    assert result == "test_value"
 
-    # Check if the result is as expected
-    expected_output = {"test_key": "test_value"}
-    assert result == expected_output, f"Expected {expected_output}, but got {result}"
 
-    print("MemoryRead test passed! ......")
+def test_memory_read_missing_key_returns_none():
+    memory_read = MemoryRead()
+    memory_read._memory = {}
+
+    # Missing key short-circuits without touching the store.
+    assert memory_read.evaluate({"required_inputs": {}}) is None
+
+
+def test_memory_write_then_read_share_store():
+    # MemoryWrite and MemoryRead cooperate through the same shared store.
+    memory = {}
+    writer = MemoryWrite()
+    reader = MemoryRead()
+    writer._memory = memory
+    reader._memory = memory
+
+    writer.evaluate(_inputs("greeting", "hello"))
+
+    assert reader.evaluate(_inputs("greeting")) == "hello"
