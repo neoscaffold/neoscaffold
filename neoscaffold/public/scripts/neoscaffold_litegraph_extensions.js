@@ -203,6 +203,24 @@
       return this.parseJsonResponse(response);
     },
 
+    // v1 agent API: conversational harness that builds a workflow, executes it,
+    // and iterates on execution failures.
+    async runHarness(request, extras) {
+      const authorizationHeaders = await this.getAuthorizationHeaders();
+      authorizationHeaders['Content-Type'] = 'application/json';
+      const payload = extras || {};
+      const response = await fetch(`${this.baseURL}/v1/agent/run`, {
+        method: 'POST',
+        headers: authorizationHeaders,
+        body: JSON.stringify({
+          request: request,
+          workflow: payload.workflow || {},
+          max_iterations: payload.max_iterations || 3,
+        }),
+      });
+      return this.parseJsonResponse(response);
+    },
+
     async suggestExecutionFix(payload) {
       const authorizationHeaders = await this.getAuthorizationHeaders();
       authorizationHeaders['Content-Type'] = 'application/json';
@@ -3056,18 +3074,31 @@
       if (!isFinite(minX)) {
         return;
       }
-      const pad = 80;
+      const pad = 40;
       const width = canvas.canvas.width;
       const height = canvas.canvas.height;
+      // Reserve space for chrome that overlays the canvas so nodes are never
+      // clipped: the bottom toolbar + prompt bar sit over the lower canvas edge,
+      // and the side panels hug the top corners.
+      const reserveTop = 24;
+      const reserveBottom = 150;
+      const reserveLeft = 24;
+      const reserveRight = 24;
+      const viewWidth = Math.max(80, width - reserveLeft - reserveRight);
+      const viewHeight = Math.max(80, height - reserveTop - reserveBottom);
       const graphWidth = maxX - minX + pad * 2;
       const graphHeight = maxY - minY + pad * 2;
-      let scale = Math.min(width / graphWidth, height / graphHeight);
+      let scale = Math.min(viewWidth / graphWidth, viewHeight / graphHeight);
       scale = Math.max(0.15, Math.min(scale, 1));
       const centerX = (minX + maxX) / 2;
       const centerY = (minY + maxY) / 2;
+      // Center the graph within the visible region (above the bottom toolbar),
+      // not the full canvas rectangle.
+      const targetScreenX = reserveLeft + viewWidth / 2;
+      const targetScreenY = reserveTop + viewHeight / 2;
       canvas.ds.scale = scale;
-      canvas.ds.offset[0] = width / (2 * scale) - centerX;
-      canvas.ds.offset[1] = height / (2 * scale) - centerY;
+      canvas.ds.offset[0] = targetScreenX / scale - centerX;
+      canvas.ds.offset[1] = targetScreenY / scale - centerY;
       if (canvas.setDirty) {
         canvas.setDirty(true, true);
       }
@@ -4143,7 +4174,18 @@
       result.classList.add('npb-result');
       result.style.display = 'none';
 
+      const harnessLabel = document.createElement('label');
+      harnessLabel.className = 'npb-harness-toggle';
+      harnessLabel.title =
+        'Iterate: build the workflow, execute it, and refine on execution errors.';
+      const harnessToggle = document.createElement('input');
+      harnessToggle.type = 'checkbox';
+      harnessToggle.setAttribute('data-test-prompt-harness', '');
+      harnessLabel.appendChild(harnessToggle);
+      harnessLabel.appendChild(document.createTextNode(' Iterate'));
+
       form.appendChild(input);
+      form.appendChild(harnessLabel);
       form.appendChild(button);
       body.appendChild(transcript);
       body.appendChild(form);
@@ -4217,6 +4259,29 @@
               output.className = 'npb-turn-output';
               output.textContent = turn.output;
               wrap.appendChild(output);
+            }
+            if ((turn.codeSuggestions || []).length) {
+              turn.codeSuggestions.forEach((suggestion) => {
+                const block = document.createElement('details');
+                block.className = 'npb-code-suggestion';
+                block.setAttribute('data-test-prompt-code-suggestion', '');
+                const summaryEl = document.createElement('summary');
+                summaryEl.className = 'npb-code-summary';
+                summaryEl.textContent =
+                  `Suggested code update to ${suggestion.node_type} (review before applying)`;
+                block.appendChild(summaryEl);
+                if (suggestion.rationale) {
+                  const why = document.createElement('div');
+                  why.className = 'npb-code-rationale';
+                  why.textContent = suggestion.rationale;
+                  block.appendChild(why);
+                }
+                const pre = document.createElement('pre');
+                pre.className = 'npb-code';
+                pre.textContent = suggestion.suggested_code || '';
+                block.appendChild(pre);
+                wrap.appendChild(block);
+              });
             }
             if (turn.error) {
               wrap.classList.add('npb-turn-error');
@@ -4296,6 +4361,61 @@
             workflowSnapshot = await scope.graphToPrompt(scope.graph);
           } catch (error) {
             workflowSnapshot = {};
+          }
+          if (harnessToggle.checked) {
+            const run = await scope.api.runHarness(text, { workflow: workflowSnapshot });
+            const created = (run.final_prompt && Object.keys(run.final_prompt).length)
+              ? scope.importPromptGraph({ prompt: run.final_prompt, layout: run.layout || {} })
+              : 0;
+            const trace = (run.iterations || []).map((it) => {
+              const changes = (it.change_summary || []).join('; ') || 'no graph changes';
+              let result;
+              if (!it.execution_ok) {
+                result = 'failed to run';
+              } else if (it.intent_met === false) {
+                result = 'ran, intent not met';
+              } else if (it.intent_met === true) {
+                result = 'ran, intent met';
+              } else {
+                result = 'ran OK';
+              }
+              return `#${it.index}: ${changes} → ${result}`;
+            });
+            // Communicate the terminal (sink) result — prefer a ConsoleLog
+            // node's output — rather than arbitrary intermediate node values.
+            const finalPrompt = run.final_prompt || {};
+            const finalOutputs = run.final_outputs || {};
+            const logIds = Object.keys(finalPrompt).filter(
+              (id) => (finalPrompt[id] || {}).type === 'ConsoleLog',
+            );
+            const outputKeys = Object.keys(finalOutputs);
+            const pickId = logIds.length
+              ? logIds[logIds.length - 1]
+              : outputKeys[outputKeys.length - 1];
+            const finalValue =
+              pickId != null && finalOutputs[pickId] != null
+                ? String(finalOutputs[pickId])
+                : '';
+            const summaryText =
+              `Harness ${run.passed ? 'succeeded' : 'stopped'} after ` +
+              `${run.iterations_used} iteration(s)` +
+              (created ? `, loaded ${created} node(s)` : '') +
+              (finalValue ? `. Result: ${finalValue}` : '.');
+            conversation.push({
+              role: 'assistant',
+              thoughts: run.reply || '',
+              plan: trace,
+              output: summaryText,
+              codeSuggestions: run.code_suggestions || [],
+            });
+            renderTranscript();
+            result.innerHTML = '';
+            const harnessSummary = document.createElement('div');
+            harnessSummary.classList.add('npb-summary');
+            harnessSummary.textContent = summaryText;
+            result.appendChild(harnessSummary);
+            result.style.display = 'block';
+            return;
           }
           const build = await scope.api.buildGraphFromPrompt(text, {
             canvas: scope.snapshotCanvasWidgets(),

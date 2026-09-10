@@ -179,6 +179,17 @@
     }
   }
 
+  .npb-harness-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    opacity: 0.85;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
   .npb-submit {
     padding: 10px 16px;
     border: none;
@@ -219,6 +230,39 @@
   .npb-error {
     background: rgba(200, 60, 60, 0.2);
     color: #ffb4b4;
+  }
+
+  .npb-code-suggestion {
+    margin-top: 6px;
+    border: 1px solid rgba(230, 181, 102, 0.4);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .npb-code-summary {
+    cursor: pointer;
+    padding: 4px 8px;
+    background: rgba(230, 181, 102, 0.18);
+    color: #e6b566;
+    font-weight: 600;
+  }
+
+  .npb-code-rationale {
+    padding: 4px 8px;
+    opacity: 0.85;
+  }
+
+  .npb-code {
+    margin: 0;
+    padding: 6px 8px;
+    max-height: 240px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #b8d982;
+    background: #101014;
   }
 
   .npb-patch-actions {

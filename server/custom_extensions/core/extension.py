@@ -2323,6 +2323,7 @@ class MemoryRead:
     }
 
     def evaluate(self, node_inputs):
+        self.key = None
         if node_inputs.get("required_inputs"):
             if "key" in node_inputs.get("required_inputs"):
                 self.key = node_inputs.get("required_inputs").get("key").get("values")

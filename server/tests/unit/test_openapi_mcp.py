@@ -15,6 +15,7 @@ def test_openapi_spec_shape():
     paths = spec["paths"]
     for path in (
         "/v1/agent/build-graph",
+        "/v1/agent/run",
         "/v1/agent/import-workflow",
         "/v1/agent/export-workflow",
         "/v1/agent/suggest-fix",
@@ -37,6 +38,7 @@ def test_toolset_lists_tools_from_operations():
     names = {t["name"] for t in toolset.tools()}
     assert {
         "buildGraph",
+        "runHarness",
         "runPrompt",
         "listExtensions",
         "getMetrics",
