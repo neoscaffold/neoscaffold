@@ -41,7 +41,7 @@ from ...harness.workflows import (
     is_prompt_graph,
 )
 
-DEFAULT_GRAPH_MODEL = os.environ.get("NEOSCAFFOLD_GRAPH_MODEL", "gpt-4o-mini")
+DEFAULT_GRAPH_MODEL = os.environ.get("NEOSCAFFOLD_GRAPH_MODEL", "gpt-5.6-terra")
 
 # Node types the offline planner composes from. All are provided by the core /
 # network_requests extensions that ship with NeoScaffold.
@@ -1097,7 +1097,7 @@ def make_openai_planner(
 
     Controlled by env:
     - ``OPENAI_API_KEY`` — enables the live planner
-    - ``NEOSCAFFOLD_GRAPH_MODEL`` — model id (default ``gpt-4o-mini``)
+    - ``NEOSCAFFOLD_GRAPH_MODEL`` — model id (default ``gpt-5.6-terra``)
     - ``NEOSCAFFOLD_GRAPH_OFFLINE=1`` — force the offline planner even if a key is set
     """
     offline_forced = os.environ.get("NEOSCAFFOLD_GRAPH_OFFLINE", "").lower() in (
