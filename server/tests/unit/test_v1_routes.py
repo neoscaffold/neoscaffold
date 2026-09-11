@@ -76,7 +76,7 @@ def test_healthz(loop):
             assert resp.status == 200
             body = await resp.json()
             assert body["status"] == "ok"
-            assert body["version"] == "1.0.1"
+            assert body["version"] == "1.0.2"
             assert body["nodes"] > 0
         finally:
             await client.close()

@@ -34,6 +34,11 @@ from ...harness.parsing import (
     repair_connectivity,
     rewrite_misused_combiners,
 )
+from ...harness.structural_edit import (
+    apply_structural_edits,
+    current_prompt,
+    is_structural_request,
+)
 from ...harness.workflows import (
     canvas_to_prompt,
     export_workflow,
@@ -126,6 +131,10 @@ class BuildResult:
     thoughts: str = ""
     widget_edits: List[Dict[str, Any]] = field(default_factory=list)
     exported_workflow: Optional[Dict[str, Any]] = None
+    graph_patch: Dict[str, Any] = field(
+        default_factory=lambda: {"add_nodes": {}, "wire": [], "set": []}
+    )
+    apply_mode: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         payload = {
@@ -136,6 +145,8 @@ class BuildResult:
             "source": self.source,
             "thoughts": self.thoughts,
             "widget_edits": self.widget_edits,
+            "graph_patch": self.graph_patch,
+            "apply_mode": self.apply_mode,
         }
         if self.exported_workflow is not None:
             payload["exported_workflow"] = self.exported_workflow
@@ -195,10 +206,17 @@ class GraphBuilder:
             portable = self._import_or_export(text)
             if portable is not None:
                 result = portable
-            elif self.llm is not None:
-                result = self._build_with_llm(text)
             else:
-                result = self._build_offline(text)
+                existing = self._existing_prompt()
+                structural = self._structural_result(text, existing)
+                if structural is not None:
+                    result = structural
+                elif self.llm is not None:
+                    result = self._build_with_llm(text)
+                    result = self._prefer_existing_over_fallback(text, result, existing)
+                else:
+                    result = self._build_offline(text)
+                    result = self._prefer_existing_over_fallback(text, result, existing)
         except Exception as exc:
             AGENT_EVENTS.finish(event_id, status="failed", detail={"error": str(exc)})
             raise
@@ -289,6 +307,98 @@ class GraphBuilder:
                     ),
                 )
         return None
+
+    def _existing_prompt(self) -> Dict[str, Any]:
+        return current_prompt(self._workflow)
+
+    def _parse_lenient(self, payload: Mapping[str, Any]) -> GraphSpec:
+        try:
+            return parse_graph(payload, contracts=self.contracts)
+        except ParseError:
+            return parse_graph(payload, contracts=None)
+
+    def _structural_result(
+        self, text: str, existing: Optional[Mapping[str, Any]]
+    ) -> Optional[BuildResult]:
+        if not existing or not is_structural_request(text, self._history):
+            return None
+        edited = apply_structural_edits(existing, text, self._history)
+        if not edited.changed:
+            return None
+        spec = self._parse_lenient(edited.prompt)
+        return BuildResult(
+            spec=spec,
+            prompt=edited.prompt,
+            plan=edited.plan or ["Applied structural wiring on the current workflow."],
+            thoughts=edited.thoughts,
+            warnings=lint_graph(spec, self.contracts) if self.contracts else [],
+            repairs=["applied deterministic structural edits"],
+            source="structural",
+            graph_patch=edited.patch,
+            apply_mode="reconcile",
+        )
+
+    def _prefer_existing_over_fallback(
+        self,
+        text: str,
+        result: BuildResult,
+        existing: Optional[Mapping[str, Any]],
+    ) -> BuildResult:
+        """Do not replace a real canvas with PromptNode+ConsoleLog or widget-only."""
+        if not existing or len(existing) <= 3:
+            return result
+        if result.apply_mode == "reconcile" or result.source == "structural":
+            return result
+        if not is_structural_request(text, self._history):
+            return result
+        if _looks_like_unrelated_fallback(result.prompt, existing):
+            edited = apply_structural_edits(existing, text, self._history)
+            if edited.changed:
+                spec = self._parse_lenient(edited.prompt)
+                return BuildResult(
+                    spec=spec,
+                    prompt=edited.prompt,
+                    plan=edited.plan + list(result.plan or []),
+                    thoughts=edited.thoughts or result.thoughts,
+                    warnings=lint_graph(spec, self.contracts) if self.contracts else [],
+                    repairs=list(result.repairs or [])
+                    + ["ignored unrelated fallback; applied structural edits"],
+                    source="structural",
+                    graph_patch=edited.patch,
+                    apply_mode="reconcile",
+                )
+            spec = self._parse_lenient(existing)
+            return BuildResult(
+                spec=spec,
+                prompt=dict(existing),
+                plan=list(result.plan or [])
+                + ["Kept the current workflow; the planner had no structural patch."],
+                thoughts=result.thoughts
+                or "No safe graph rewrite; left the current workflow in place.",
+                warnings=lint_graph(spec, self.contracts) if self.contracts else [],
+                repairs=list(result.repairs or [])
+                + ["rejected PromptNode fallback over an existing workflow"],
+                source=result.source or "offline",
+                apply_mode="reconcile",
+            )
+        if is_structural_request(text, self._history) and not result.prompt:
+            edited = apply_structural_edits(existing, text, self._history)
+            if edited.changed:
+                spec = self._parse_lenient(edited.prompt)
+                return BuildResult(
+                    spec=spec,
+                    prompt=edited.prompt,
+                    plan=edited.plan or list(result.plan or []),
+                    thoughts=edited.thoughts or result.thoughts,
+                    warnings=lint_graph(spec, self.contracts) if self.contracts else [],
+                    repairs=list(result.repairs or [])
+                    + ["replaced widget-only reply with structural wiring"],
+                    source="structural",
+                    graph_patch=edited.patch,
+                    apply_mode="reconcile",
+                    widget_edits=result.widget_edits,
+                )
+        return result
 
     def _widget_edit_result(
         self,
@@ -563,11 +673,24 @@ class GraphBuilder:
                 "\nConversation so far:\n"
                 + json.dumps(self._history[-12:], ensure_ascii=False)[:4000]
             )
+        existing = self._existing_prompt()
+        if existing:
+            parts.append(
+                "\nCurrent prompt-graph (node_id -> type/name/inputs). "
+                "This is the live workflow. When the user asks to rewire, fix a "
+                "loop/if, or apply previously described graph changes, return "
+                "the COMPLETE updated prompt with the same node ids. Edges are "
+                '{"originId": "<id>"} — never widget_edits. Do not return an '
+                "empty prompt and do not replace this graph with a new "
+                "PromptNode+ConsoleLog pair.\n"
+                + json.dumps(existing, ensure_ascii=False)[:12000]
+            )
         if self._canvas:
             parts.append(
                 "\nCurrent canvas widgets (node_id -> type/name/widgets). "
-                "To change an existing widget, emit widget_edits using these node_ids; "
-                "do not rebuild the graph unless the user asked for new nodes.\n"
+                "Use widget_edits only for literal value tweaks (prompt text, "
+                "numbers, keys). Wiring, loop/if control, and 'make those "
+                "changes' require a full updated prompt graph.\n"
                 + json.dumps(self._canvas, ensure_ascii=False)[:8000]
             )
         return "\n".join(parts)
@@ -950,6 +1073,24 @@ def offline_widget_edits(text: str, canvas: Mapping[str, Any]) -> List[Dict[str,
     return edits
 
 
+_FALLBACK_TYPES = frozenset({"PromptNode", "nsString", "ConsoleLog", "PassThrough"})
+
+
+def _looks_like_unrelated_fallback(
+    proposed: Optional[Mapping[str, Any]], existing: Mapping[str, Any]
+) -> bool:
+    if not proposed or not existing:
+        return False
+    if len(existing) <= len(proposed) + 2:
+        return False
+    types = {
+        node.get("type")
+        for node in proposed.values()
+        if isinstance(node, dict)
+    }
+    return bool(types) and types <= _FALLBACK_TYPES and len(proposed) <= 3
+
+
 def build_graph(
     prompt: str,
     *,
@@ -1044,8 +1185,11 @@ def _planner_prompt(known_nodes: Optional[Mapping[str, Any]]) -> str:
         '  "widget_edits": [{"node_id": "15", "widget": "prompt", "value": "..."}],\n'
         '  "prompt": {"<id>": {"type": "<NodeType>", "name": "...", "inputs": {...}}}\n'
         "}\n"
-        "Use widget_edits to change existing canvas widgets (any widget on any node). "
-        "Use prompt only when the user wants new nodes. You may return both.\n\n"
+        "Use widget_edits only for literal value tweaks on existing widgets. "
+        "When the user asks to rewire, fix a loop/if, place a node before "
+        "EndWhileLoop, or apply previously described graph changes, return the "
+        "COMPLETE updated prompt with the same node ids — never an empty "
+        "prompt, and never widget_edits for edges.\n\n"
         "Rules:\n"
         "- Node ids are unique string keys (\"1\", \"2\", ...).\n"
         "- EVERY dataflow input MUST be wired with "
@@ -1077,6 +1221,13 @@ def _planner_prompt(known_nodes: Optional[Mapping[str, Any]]) -> str:
         "is an originId. ForEachLoop.collection is an originId to an array.\n"
         "  The first body node must be a successor of the loop "
         "(wire ignored_input from the loop).\n"
+        "- A WhileLoop is finite only when the terminating MemoryWrite is an "
+        "ancestor of EndWhileLoop (decrement remaining, compare to 0, true "
+        "branch writes the condition false). Widget-only flag flips do not "
+        "repair branch or loop-back edges.\n"
+        "- If the user names an agent (e.g. the 2nd CursorAgent) before "
+        "EndWhileLoop, that agent's output MUST be EndWhileLoop.node_inputs "
+        "(directly or via a PassThrough that also waits on EndIfEqual).\n"
         "- Import: if the user pastes a workflow JSON (prompt-graph or "
         "LiteGraph {nodes, links}), return that graph in prompt.\n"
         "- Export: if the user asks to export/save the workflow, return "

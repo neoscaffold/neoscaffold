@@ -407,6 +407,7 @@ class Server:
         return workflow_session
 
     def toggle_stop_points(self, client_id, workflow_id, node_ids=[], all_stop=False):
+        session = self.get_or_create_session(client_id)
         workflow_session = self.get_or_create_workflow_session(client_id, workflow_id)
 
         # allowed to raise an error if the interventions are not set
@@ -421,6 +422,18 @@ class Server:
             stop_points["nodes"] = {}
 
         stop_points["all_stop"] = all_stop
+        # Toolbar Stop must halt the in-flight run even if the posted
+        # workflow checksum no longer matches the queued prompt.
+        if all_stop:
+            session["_all_stop"] = True
+            for value in session.values():
+                if not isinstance(value, dict) or "interventions" not in value:
+                    continue
+                points = value["interventions"].setdefault(
+                    "stop-points", {"nodes": {}}
+                )
+                points.setdefault("nodes", {})
+                points["all_stop"] = True
 
         for node_id in node_ids:
             if node_id in stop_points["nodes"]:

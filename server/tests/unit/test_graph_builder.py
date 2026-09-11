@@ -539,6 +539,8 @@ def test_planner_prompt_includes_registration_contracts():
     assert "ForLoop" in text
     assert "EndWhileLoop" in text
     assert "import" in text.lower()
+    assert "never an empty prompt" in text
+    assert "EndWhileLoop.node_inputs" in text
 
 
 def test_make_openai_planner_none_without_key(monkeypatch):

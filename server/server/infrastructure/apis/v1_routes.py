@@ -1,4 +1,4 @@
-"""Versioned v1 HTTP surface for NeoScaffold 1.0.1.
+"""Versioned v1 HTTP surface for NeoScaffold 1.0.2.
 
 Additive, backward-compatible routes:
 
@@ -31,7 +31,7 @@ from ...harness.workflow_agent import (
     make_llm_verifier,
 )
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 
 def _authorized_user(request):
@@ -218,6 +218,8 @@ def v1_routes(server):
             "source": result.source,
             "thoughts": result.thoughts,
             "widget_edits": result.widget_edits,
+            "graph_patch": result.graph_patch,
+            "apply_mode": result.apply_mode,
         }
         if result.exported_workflow is not None:
             payload["exported_workflow"] = result.exported_workflow

@@ -87,6 +87,7 @@ class GraphExecutor:
             "server": self.server,
             "client_id": response.get("client_id", self.server.client_id),
             "workflow_id": response.get("workflow_id", self.server.current_workflow_id),
+            "prompt_id": response.get("prompt_id"),
             "parallel": True,
         }
 
@@ -264,8 +265,32 @@ class GraphExecutor:
                 break
 
             completed_tasks, _ = await asyncio.wait(
-                running_tasks.keys(), return_when=asyncio.FIRST_COMPLETED
+                running_tasks.keys(),
+                return_when=asyncio.FIRST_COMPLETED,
+                timeout=0.1,
             )
+            if not completed_tasks:
+                scheduler_action = await apply_parallel_scheduler_interventions(
+                    ready_queue=ready_queue,
+                    running_tasks=running_tasks,
+                    memory=memory,
+                )
+                if scheduler_action:
+                    runtime_action = RuntimeAction(
+                        scheduler_action.get("runtime_action", RuntimeAction.EVALUATE)
+                    )
+                    if runtime_action == RuntimeAction.RETURN:
+                        await cancel_running_tasks()
+                        return graph_results
+                    if runtime_action == RuntimeAction.GOTO:
+                        await cancel_running_tasks()
+                        destination_node_id = scheduler_action.get(
+                            "destination_node_id"
+                        )
+                        if not destination_node_id:
+                            return graph_results
+                        invalidate_parallel_goto(destination_node_id)
+                continue
 
             for task in completed_tasks:
                 node_id = running_tasks.pop(task)
@@ -345,6 +370,7 @@ class GraphExecutor:
             "server": self.server,
             "client_id": response.get("client_id", self.server.client_id),
             "workflow_id": response.get("workflow_id", self.server.current_workflow_id),
+            "prompt_id": response.get("prompt_id"),
             "parallel": False,
         }
 
@@ -379,6 +405,12 @@ async def sequential_runtime_step(
     workflow_id = memory.get("workflow_id", server.current_workflow_id)
 
     node_id = action.get("node_id")
+
+    # Let pending Stop POSTs land before the next node (or loop-back) runs.
+    await asyncio.sleep(0)
+    stop_action = await apply_stop_intervention(node_id=node_id, memory=memory)
+    if stop_action:
+        return None
 
     # TODO: refactor this section to be less repetitive and more readable
     interventions = (
@@ -441,29 +473,6 @@ async def sequential_runtime_step(
 
             # reset the all_restart flag
             restart_points["all_restart"] = False
-
-    stop_points = interventions.get("stop-points")
-    if stop_points:
-        # handle stop points
-
-        # all_stop is a flag that stops the workflow at the last node
-        all_stop = stop_points.get("all_stop", False)
-
-        in_list = node_id in stop_points.get("nodes", {})
-        if in_list or all_stop:
-            # notify the client that the execution has been stopped
-            await server.send_json(
-                event="message",
-                data={"stop-point": node_id},
-                sid=client_id,
-            )
-            # set the runtime action to return
-            evaluation_override_actions[node_id] = EvaluationAction(
-                node_id=node_id, runtime_action=RuntimeAction.RETURN
-            ).to_dict()
-
-            # reset the all_stop flag
-            stop_points["all_stop"] = False
 
     # override the action if there is an override for it planned
     if node_id in evaluation_override_actions:
@@ -626,12 +635,14 @@ async def sequential_runtime_step(
         )
         raise node_missing_exception
 
-    # if this is the last node but it now has an evaluation_override_action that it self-assigned, return that action, because this is a program that ends with a control-flow node
-    if (
-        node_id in evaluation_override_actions
-        and index_of_node_id < len(graph_nodes) - 1
-    ):
+    # Control-flow nodes (WhileLoop/EndWhileLoop) assign a GOTO after evaluate.
+    # Honor it on the last node too — otherwise a terminator cannot loop back.
+    if node_id in evaluation_override_actions:
         memory["_next_action"] = evaluation_override_actions[node_id]
+
+    stop_action = await apply_stop_intervention(node_id=node_id, memory=memory)
+    if stop_action:
+        return None
 
     return memory["_next_action"]
 
@@ -791,20 +802,9 @@ async def apply_parallel_interventions(
                 destination_node_id=memory["graph_nodes"][0],
             ).to_dict()
 
-    stop_points = interventions.get("stop-points")
-    if stop_points:
-        all_stop = stop_points.get("all_stop", False)
-        in_list = node_id in stop_points.get("nodes", {})
-        if in_list or all_stop:
-            await server.send_json(
-                event="message",
-                data={"stop-point": node_id},
-                sid=client_id,
-            )
-            stop_points["all_stop"] = False
-            return EvaluationAction(
-                node_id=node_id, runtime_action=RuntimeAction.RETURN
-            ).to_dict()
+    stop_action = await apply_stop_intervention(node_id=node_id, memory=memory)
+    if stop_action:
+        return stop_action
 
     return action
 
@@ -910,30 +910,52 @@ def clear_breakpoint_intervention(node_id, memory):
         event.set()
 
 
+def consume_stop_request(server, client_id, workflow_id, node_id):
+    """Return True when toolbar Stop or a stop-point should halt this run."""
+    session = server.sessions.get(client_id)
+    if not isinstance(session, dict):
+        return False
+
+    client_stop = bool(session.get("_all_stop"))
+    workflow_session = session.get(workflow_id)
+    stop_points = {}
+    if isinstance(workflow_session, dict):
+        stop_points = (
+            (workflow_session.get("interventions") or {}).get("stop-points") or {}
+        )
+    all_stop = bool(stop_points.get("all_stop"))
+    in_list = node_id is not None and node_id in (stop_points.get("nodes") or {})
+    if not (client_stop or all_stop or in_list):
+        return False
+
+    if client_stop:
+        session["_all_stop"] = False
+    if all_stop or client_stop:
+        for value in session.values():
+            if not isinstance(value, dict) or "interventions" not in value:
+                continue
+            points = (value.get("interventions") or {}).get("stop-points")
+            if isinstance(points, dict):
+                points["all_stop"] = False
+    return True
+
+
 async def apply_stop_intervention(node_id, memory):
     server = memory["server"]
     client_id = memory.get("client_id", server.client_id)
     workflow_id = memory.get("workflow_id", server.current_workflow_id)
-    interventions = get_workflow_interventions(
-        server=server,
-        client_id=client_id,
-        workflow_id=workflow_id,
-    )
-    stop_points = interventions.get("stop-points")
-    if not stop_points:
-        return None
-
-    all_stop = stop_points.get("all_stop", False)
-    in_list = node_id in stop_points.get("nodes", {})
-    if not (all_stop or in_list):
+    if not consume_stop_request(server, client_id, workflow_id, node_id):
         return None
 
     await server.send_json(
         event="message",
-        data={"stop-point": node_id},
+        data={
+            "stop-point": node_id,
+            "stopped": True,
+            "prompt_id": memory.get("prompt_id"),
+        },
         sid=client_id,
     )
-    stop_points["all_stop"] = False
     return EvaluationAction(
         node_id=node_id, runtime_action=RuntimeAction.RETURN
     ).to_dict()

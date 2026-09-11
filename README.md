@@ -1,7 +1,7 @@
 <div align="center">
   <!-- Version Badge -->
   <a href='https://github.com/neoscaffold/neoscaffold/releases'>
-    <img src='https://img.shields.io/badge/version-1.0.1-black?style=for-the-badge'>
+    <img src='https://img.shields.io/badge/version-1.0.2-black?style=for-the-badge'>
   </a>
   <!-- Chat Badge -->
   <a href='https://discord.gg/fWncYRBY'>
@@ -28,10 +28,6 @@ You can import, edit, and export workflows for:
   - iterating quickly on new ideas
   - describing a workflow in natural language and getting a validated graph
   - driving the editor from other agents over OpenAPI and MCP
-
-**Version 1.0.1** adds a conversational workflow harness: from the prompt bar's **Iterate** toggle (or `POST /v1/agent/run`) a request is turned into a workflow, **executed**, **verified against your intent** by an LLM judge, and **refined** until it both runs and satisfies the request. Every iteration communicates a structured graph diff (added/removed nodes, wiring, widget changes), and when the graph alone can't satisfy a request the harness suggests a review-only code update to the implicated node. The harness is part of the OpenAPI/MCP contract, so other agents can drive it too.
-
-**Version 1.0.0** is the first production release. The editor Prompt bar turns a request into a parse-validated prompt-graph (`POST /v1/agent/build-graph`). Agent Activity shows live subagent output. Other agents can control NeoScaffold through an OpenAPI 3.1 contract and an MCP tools server. Failed runs can ask how to fix the graph and arm a patch to accept. Parallel execution from 0.2.0 remains: sequential or parallel mode, async node evaluation, and control-flow through `IfEqual` / `ForLoop` / `WhileLoop` `End*` nodes.
 
 See [CHANGELOG.md](CHANGELOG.md), the [engineering harness](harness.md), [MCP + OpenAPI](docs/MCP.md), and the [v1.0.0 roadmap](docs/ROADMAP_1.0.0.md).
 

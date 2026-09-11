@@ -511,6 +511,23 @@
 
           const promptId = data.prompt_id || global.NeoScaffold.activePromptId || 'unknown';
 
+          if (data.stopped || data['stop-point']) {
+            const stoppedId = data['stop-point'];
+            const stoppedNode = stoppedId != null
+              ? global.NeoScaffold.graph.getNodeById(stoppedId)
+              : null;
+            if (stoppedNode) {
+              scope.instance.markRemainingNodesCancelled(promptId);
+              scope.instance.litegraphCanvas.centerOnNode(stoppedNode);
+            } else {
+              scope.instance.markRemainingNodesCancelled(promptId);
+            }
+            NeoScaffold.isPaused = false;
+            NeoScaffold.runningWorkflowId = null;
+            global.NeoScaffold.graph.setDirtyCanvas(true);
+            return;
+          }
+
           if (data.breakpoint) {
             let node = global.NeoScaffold.graph.getNodeById(data.breakpoint);
             if (node) {
@@ -606,6 +623,7 @@
     processingQueue: false,
 
     executionMode: 'sequential',
+    runningWorkflowId: null,
     cameraFollowRunningNode: false,
     runningProgressTimer: null,
     executionState: {
@@ -2324,6 +2342,9 @@
         queuedPrompt.promptId = promptId;
         queuedPrompt.executionMode = this.executionMode || 'sequential';
         this.activePromptId = promptId;
+        this.runningWorkflowId = (prompt.workflow && prompt.workflow.checksum)
+          || prompt.checksum
+          || this.runningWorkflowId;
         this.resetExecutionState(promptId);
 
         queueItem = {
@@ -2735,7 +2756,160 @@
       if (targetSlot < 0) {
         return false;
       }
+      this.disconnectGraphInput(target, inputName);
       return Boolean(origin.connect(0, target, targetSlot));
+    },
+
+    disconnectGraphInput(target, inputName) {
+      if (!target || !this.graph) {
+        return false;
+      }
+      let targetSlot = target.findInputSlot ? target.findInputSlot(inputName) : -1;
+      if (targetSlot < 0 && Array.isArray(target.inputs)) {
+        targetSlot = target.inputs.findIndex(function (slot) {
+          return slot && slot.name === inputName;
+        });
+      }
+      if (targetSlot < 0 || !target.inputs || !target.inputs[targetSlot]) {
+        return false;
+      }
+      const linkId = target.inputs[targetSlot].link;
+      if (linkId == null) {
+        return false;
+      }
+      if (typeof this.graph.removeLink === 'function') {
+        this.graph.removeLink(linkId);
+        return true;
+      }
+      if (typeof target.disconnectInput === 'function') {
+        target.disconnectInput(targetSlot);
+        return true;
+      }
+      return false;
+    },
+
+    graphPatchHasWork(patch) {
+      if (!patch || typeof patch !== 'object') {
+        return false;
+      }
+      const addNodes = patch.add_nodes || {};
+      return Boolean(
+        Object.keys(addNodes).length
+        || (patch.wire && patch.wire.length)
+        || (patch.set && patch.set.length)
+      );
+    },
+
+    incomingPromptOverlapsCanvas(prompt) {
+      if (!prompt || !this.graph || !this.graph._nodes) {
+        return false;
+      }
+      let overlap = 0;
+      Object.keys(prompt).forEach((nodeId) => {
+        const spec = prompt[nodeId] || {};
+        const existing = this.resolveGraphNode(nodeId);
+        if (existing && existing.type === spec.type) {
+          overlap += 1;
+        }
+      });
+      return overlap >= 2;
+    },
+
+    applyIncomingGraph(result, extras) {
+      extras = extras || {};
+      const prompt = (result && result.prompt) || {};
+      const patch = extras.graph_patch || (result && result.graph_patch) || {};
+      const applyMode = extras.apply_mode || (result && result.apply_mode) || '';
+      if (this.graphPatchHasWork(patch)) {
+        return { kind: 'patch', count: this.applyGraphPatch(patch) };
+      }
+      if (
+        applyMode === 'reconcile'
+        || this.incomingPromptOverlapsCanvas(prompt)
+      ) {
+        return { kind: 'reconcile', count: this.reconcilePromptGraph(result) };
+      }
+      if (prompt && Object.keys(prompt).length) {
+        return { kind: 'add', count: this.importPromptGraph(result) };
+      }
+      return { kind: 'none', count: 0 };
+    },
+
+    reconcilePromptGraph(result) {
+      if (!result || !result.prompt || !this.graph) {
+        return 0;
+      }
+      const prompt = result.prompt;
+      const computedLayout = this.layoutPromptGraph ? this.layoutPromptGraph(prompt) : {};
+      const layout = Object.assign({}, result.layout || {}, computedLayout);
+      const idToNode = {};
+      let changed = 0;
+
+      Object.keys(prompt).forEach((nodeId) => {
+        const spec = prompt[nodeId] || {};
+        let node = this.resolveGraphNode(nodeId);
+        if (node && spec.type && node.type !== spec.type) {
+          node = null;
+        }
+        if (!node) {
+          node = LiteGraph.createNode(spec.type);
+          if (!node) {
+            console.warn('[neoscaffold] unknown node type for reconcile:', spec.type);
+            return;
+          }
+          const numericId = Number(nodeId);
+          if (!Number.isNaN(numericId)) {
+            node.id = numericId;
+          }
+          const pos = layout[nodeId];
+          if (pos) {
+            node.pos = [pos[0], pos[1]];
+          }
+          this.graph.add(node);
+          changed += 1;
+        }
+        idToNode[nodeId] = node;
+
+        const inputs = spec.inputs || {};
+        Object.keys(inputs).forEach((inputName) => {
+          const value = inputs[inputName];
+          const isEdge = value && typeof value === 'object' && value.originId != null;
+          if (isEdge || !node.widgets || !node.widgets.length) {
+            return;
+          }
+          const widget = node.widgets.find((item) => item.name === inputName);
+          if (widget && widget.value !== value) {
+            widget.value = value;
+            changed += 1;
+          }
+        });
+      });
+
+      Object.keys(prompt).forEach((nodeId) => {
+        const target = idToNode[nodeId];
+        if (!target) {
+          return;
+        }
+        const inputs = (prompt[nodeId] || {}).inputs || {};
+        Object.keys(inputs).forEach((inputName) => {
+          const value = inputs[inputName];
+          if (!(value && typeof value === 'object' && value.originId != null)) {
+            return;
+          }
+          const origin = idToNode[String(value.originId)] || this.resolveGraphNode(value.originId);
+          if (this.connectGraphInput(origin, target, inputName)) {
+            changed += 1;
+          }
+        });
+      });
+
+      if (this.graph.setDirtyCanvas) {
+        this.graph.setDirtyCanvas(true, true);
+      }
+      if (this.graph.change) {
+        this.graph.change();
+      }
+      return changed;
     },
 
     applyGraphPatch(patch) {
@@ -2821,7 +2995,8 @@
         if (!node || !node.widgets) {
           return;
         }
-        const widget = node.widgets.find((w) => w.name === edit.input);
+        const widgetName = edit.input || edit.widget;
+        const widget = node.widgets.find((w) => w.name === widgetName);
         if (widget) {
           widget.value = edit.value;
           changed += 1;
@@ -3644,13 +3819,18 @@
 
     async toggleStopPoints(canvas, allStop) {
       const workflowSnapshot = await NeoScaffold.export();
-      if (!workflowSnapshot) {
+      const workflowId = NeoScaffold.runningWorkflowId
+        || (workflowSnapshot && workflowSnapshot.checksum);
+      if (!workflowId) {
         return;
       }
       const nodeIds = [];
 
       if (allStop) {
-        return NeoScaffold.api.postToggleStop(workflowSnapshot.checksum, [], allStop);
+        return NeoScaffold.api.postToggleStop(workflowId, [], true);
+      }
+      if (!workflowSnapshot) {
+        return;
       }
 
       if (!canvas.selected_nodes || Object.keys(canvas.selected_nodes).length === 0) {
@@ -4364,8 +4544,13 @@
           }
           if (harnessToggle.checked) {
             const run = await scope.api.runHarness(text, { workflow: workflowSnapshot });
-            const created = (run.final_prompt && Object.keys(run.final_prompt).length)
-              ? scope.importPromptGraph({ prompt: run.final_prompt, layout: run.layout || {} })
+            const applied = scope.applyIncomingGraph(
+              { prompt: run.final_prompt || {}, layout: run.layout || {} },
+              { graph_patch: run.graph_patch, apply_mode: run.apply_mode }
+            );
+            const created = applied.kind === 'add' ? applied.count : 0;
+            const patched = applied.kind === 'patch' || applied.kind === 'reconcile'
+              ? applied.count
               : 0;
             const trace = (run.iterations || []).map((it) => {
               const changes = (it.change_summary || []).join('; ') || 'no graph changes';
@@ -4400,6 +4585,7 @@
               `Harness ${run.passed ? 'succeeded' : 'stopped'} after ` +
               `${run.iterations_used} iteration(s)` +
               (created ? `, loaded ${created} node(s)` : '') +
+              (patched ? `, applied ${patched} graph change(s)` : '') +
               (finalValue ? `. Result: ${finalValue}` : '.');
             conversation.push({
               role: 'assistant',
@@ -4423,8 +4609,13 @@
             workflow: workflowSnapshot,
           });
           const edited = scope.applyWidgetEdits(build.widget_edits || []);
-          const created = (build.prompt && Object.keys(build.prompt).length)
-            ? scope.importPromptGraph(build)
+          const applied = scope.applyIncomingGraph(build, {
+            graph_patch: build.graph_patch,
+            apply_mode: build.apply_mode,
+          });
+          const created = applied.kind === 'add' ? applied.count : 0;
+          const patched = applied.kind === 'patch' || applied.kind === 'reconcile'
+            ? applied.count
             : 0;
           let exported = 0;
           if (build.exported_workflow) {
@@ -4434,6 +4625,9 @@
           const parts = [];
           if (created) {
             parts.push(`Added ${created} node(s)`);
+          }
+          if (patched) {
+            parts.push(`Applied ${patched} graph change(s)`);
           }
           if (edited) {
             parts.push(`Updated ${edited} widget(s)`);

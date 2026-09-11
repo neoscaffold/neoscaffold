@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2 - 2026-09-11
+
+- Applied structural harness edits to the current workflow instead of describing them: loop/if termination now keeps the remaining decrement in the `EndWhileLoop` / `EndIfEqual` chain, and a requested body node (for example the second agent) is gated through `EndIfEqual` into `EndWhileLoop.node_inputs`. Returned as an in-place `graph_patch` (`apply_mode: reconcile`) so the canvas is not replaced with a PromptNode+ConsoleLog fallback.
+- Stopped toolbar **Stop** from no-oping on a checksum mismatch: `all_stop` is now client-wide, sequential runs yield and re-check between nodes (including loop-back), parallel runs poll and cancel in-flight tasks, and the editor marks remaining nodes cancelled on `stopped` / `stop-point`.
+- Accepted the removed httpx/OpenAI `proxies=` argument so agent nodes can construct an HTTP client on current httpx/OpenAI versions.
+- Bumped the advertised API version to `1.0.2` (`GET /v1/healthz`, OpenAPI, MCP server info).
+
 ## 1.0.1 - 2026-09-10
 
 - Added a conversational workflow harness (`server/server/harness/workflow_agent.py`, `WorkflowHarness`): a request is turned into a workflow, executed, verified against the user's intent, and refined on failure or unmet intent until it both runs and satisfies the request (or the attempt budget is exhausted). Exposed at `POST /v1/agent/run` (`{request, workflow?, max_iterations?, verify?, suggest_code?}` → `{passed, intent_met, intent_reason, iterations[], change_summary, code_suggestions, final_prompt, final_outputs, layout, reply}`).

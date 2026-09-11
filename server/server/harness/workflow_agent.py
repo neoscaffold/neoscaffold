@@ -184,6 +184,10 @@ class ProposeResult:
     thoughts: str = ""
     plan: List[str] = field(default_factory=list)
     source: str = ""
+    graph_patch: Dict[str, Any] = field(
+        default_factory=lambda: {"add_nodes": {}, "wire": [], "set": []}
+    )
+    apply_mode: str = ""
 
 
 @dataclass
@@ -230,6 +234,10 @@ class HarnessRun:
     intent_reason: str = ""
     change_summary: List[str] = field(default_factory=list)
     code_suggestions: List[Dict[str, Any]] = field(default_factory=list)
+    graph_patch: Dict[str, Any] = field(
+        default_factory=lambda: {"add_nodes": {}, "wire": [], "set": []}
+    )
+    apply_mode: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -245,6 +253,8 @@ class HarnessRun:
             "intent_reason": self.intent_reason,
             "change_summary": self.change_summary,
             "code_suggestions": self.code_suggestions,
+            "graph_patch": self.graph_patch,
+            "apply_mode": self.apply_mode,
         }
 
 
@@ -308,12 +318,18 @@ class WorkflowHarness:
 
         stream(f"[harness] request: {request}\n")
         last_failed_error = ""
+        last_patch: Dict[str, Any] = {"add_nodes": {}, "wire": [], "set": []}
+        last_apply_mode = ""
         for index in range(1, self.max_iterations + 1):
             stream(f"[harness] iteration {index}: proposing a workflow...\n")
             prior = current
             proposal = self.propose(request, current, feedback)
             if proposal.prompt:
                 current = proposal.prompt
+            if getattr(proposal, "graph_patch", None):
+                last_patch = proposal.graph_patch
+            if getattr(proposal, "apply_mode", None):
+                last_apply_mode = proposal.apply_mode
 
             # Communicate exactly what the agent proposes to change on the graph.
             diff = diff_graphs(prior, current)
@@ -420,6 +436,8 @@ class WorkflowHarness:
             intent_reason=intent_reason,
             change_summary=iterations[-1].change_summary if iterations else [],
             code_suggestions=code_suggestions,
+            graph_patch=last_patch,
+            apply_mode=last_apply_mode,
         )
 
 
@@ -639,6 +657,8 @@ def make_graph_proposer(
             thoughts=result.thoughts or "",
             plan=result.plan or [],
             source=result.source,
+            graph_patch=result.graph_patch,
+            apply_mode=result.apply_mode,
         )
 
     return propose

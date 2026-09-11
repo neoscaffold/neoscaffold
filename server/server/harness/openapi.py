@@ -15,7 +15,7 @@ OPENAPI_VERSION = "3.1.0"
 
 def build_openapi_spec(server: Optional[Any] = None) -> Dict[str, Any]:
     """Return the OpenAPI document describing the NeoScaffold API."""
-    version = "1.0.1"
+    version = "1.0.2"
     if server is not None:
         version = str(getattr(server, "VERSION", version) or version)
 

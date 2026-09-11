@@ -293,3 +293,37 @@ def test_harness_offline_builds_and_executes():
     assert run.passed is True
     assert run.iterations_used == 1
     assert any("harness works" == str(v) for v in run.final_outputs.values())
+
+
+def test_harness_structural_edit_rewires_existing_loop():
+    from tests.unit.test_structural_edit import loop_workflow
+
+    workflow = loop_workflow()
+
+    def execute(prompt):
+        from server.harness.workflow_agent import ExecResult
+
+        end = prompt.get("32") or {}
+        origin = (end.get("inputs") or {}).get("node_inputs") or {}
+        ok = isinstance(origin, dict) and origin.get("originId") == "4"
+        return ExecResult(
+            ok=ok,
+            outputs={"32": "loop closed after body"} if ok else {},
+            node_errors=[] if ok else [{"node_id": "32", "message": "node 4 not in EndWhileLoop"}],
+        )
+
+    harness = WorkflowHarness(
+        make_graph_proposer(KNOWN, planner=None),
+        execute,
+        max_iterations=2,
+    )
+    run = harness.run(
+        "Wire node 4 into EndWhileLoop and fix the infinite if",
+        workflow=workflow,
+    )
+    assert run.final_prompt["32"]["inputs"]["node_inputs"]["originId"] == "4"
+    assert run.graph_patch.get("wire")
+    assert run.apply_mode == "reconcile"
+    assert any(
+        "32.node_inputs" in line or "Wired node 32" in line for line in run.change_summary
+    )

@@ -1,3 +1,7 @@
+from .domain.utilities.httpx_proxies_compat import apply_httpx_proxies_compat
+
+apply_httpx_proxies_compat()
+
 from .infrastructure.servers.server import Server
 
 # quality evaluation engine

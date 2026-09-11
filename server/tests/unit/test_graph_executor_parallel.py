@@ -25,6 +25,7 @@ class FakeServer:
             "CountingValue": {"python_class": CountingValueNode},
             "GotoOnce": {"python_class": GotoOnceNode},
             "SlowCancellableValue": {"python_class": SlowCancellableValueNode},
+            "LoopBack": {"python_class": LoopBackNode},
             "SyncValue": {"python_class": SyncValueNode},
             "Join": {"python_class": JoinNode},
         }
@@ -316,6 +317,35 @@ def test_executor_sends_updates_to_response_client_id():
     assert {message["sid"] for message in server.sent_messages} == {"test-client"}
 
 
+class LoopBackNode:
+    hops = 0
+
+    INPUT = {"required_inputs": {}}
+    OUTPUT = {"kind": "VALUE", "name": "VALUE", "cacheable": False}
+
+    def evaluate(self, node_inputs):
+        LoopBackNode.hops += 1
+        self._memory["evaluation_override_actions"][self._node.node_id] = {
+            "node_id": self._node.node_id,
+            "runtime_action": int(RuntimeAction.GOTO),
+            "destination_node_id": "start",
+        }
+        return LoopBackNode.hops
+
+
+def build_loop_back_graph():
+    graph = nx.DiGraph()
+    graph.add_node("start", kind="CountingValue", nickname="Start")
+    graph.add_node(
+        "loop",
+        kind="LoopBack",
+        nickname="Loop",
+        value={"originId": "start"},
+    )
+    graph.add_edge("start", "loop")
+    return graph
+
+
 def test_parallel_executor_honors_stop_requested_while_tasks_are_running():
     async def run_with_runtime_stop():
         SlowCancellableValueNode.active_count = 0
@@ -413,6 +443,44 @@ def test_parallel_executor_honors_stop_requested_while_paused():
         message["data"].get("stop-point") == "a"
         for message in server.sent_messages
     )
+
+
+def test_stop_on_mismatched_workflow_id_still_halts_sequential_loop():
+    async def run_loop_then_stop():
+        LoopBackNode.hops = 0
+        CountingValueNode.counts = {}
+        server = FakeServer()
+        server.sessions = {
+            "test-client": {
+                "other-checksum": {
+                    "interventions": {
+                        "stop-points": {"nodes": {}, "all_stop": False},
+                    },
+                },
+            },
+        }
+        executor = GraphExecutor(server)
+        response = {
+            "prompt_id": "prompt",
+            "number": 1,
+            "client_id": "test-client",
+            "workflow_id": "running-checksum",
+        }
+        execution_task = asyncio.create_task(
+            executor.run_sequential(build_loop_back_graph(), response)
+        )
+        for _ in range(50):
+            if LoopBackNode.hops >= 3:
+                break
+            await asyncio.sleep(0.01)
+        server.sessions["test-client"]["_all_stop"] = True
+        return await asyncio.wait_for(execution_task, 1), server
+
+    graph_results, server = asyncio.run(run_loop_then_stop())
+    assert LoopBackNode.hops >= 1
+    assert LoopBackNode.hops < 50
+    assert any(message["data"].get("stopped") for message in server.sent_messages)
+    assert "loop" in graph_results
 
 
 def test_sequential_executor_honors_restart_requested_while_paused():
